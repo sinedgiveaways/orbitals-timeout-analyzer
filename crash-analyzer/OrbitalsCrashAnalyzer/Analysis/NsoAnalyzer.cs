@@ -78,7 +78,9 @@ public static class NsoAnalyzer
             output.AppendLine($"  {marker.Name} : {(locations.Count == 0 ? "non trouvé" : string.Join("; ", locations))}");
         }
 
-        var offsets = (interestingOffsets ?? []).Distinct().OrderBy(x => x).Take(32).ToArray();
+        // Preserve caller-supplied priority: crash site, LR, then unwind frames.
+        // Sorting here used to discard the most useful high offsets before Take(32).
+        var offsets = (interestingOffsets ?? []).Distinct().Take(32).ToArray();
         if (offsets.Length > 0)
         {
             output.AppendLine();
