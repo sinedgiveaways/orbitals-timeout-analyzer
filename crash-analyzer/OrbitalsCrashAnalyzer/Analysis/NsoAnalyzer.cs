@@ -86,7 +86,7 @@ public static class NsoAnalyzer
             output.AppendLine("Dump des mots 32 bits et décodage des branches usuelles. Ce n'est pas un désassembleur complet.");
             foreach (var address in offsets)
             {
-                var seg = segments.FirstOrDefault(s => address >= s.MemoryOffset && address + 4 <= (ulong)s.MemoryOffset + s.Data.Length);
+                var seg = segments.FirstOrDefault(s => address >= s.MemoryOffset && address + 4UL <= (ulong)s.MemoryOffset + s.Data.Length);
                 if (seg is null) { output.AppendLine($"main+0x{address:X} : hors des segments chargés."); continue; }
                 int at = checked((int)(address - seg.MemoryOffset));
                 output.AppendLine();
@@ -122,6 +122,6 @@ public static class NsoAnalyzer
         return "instruction ARM64 (décodage non implémenté)";
     }
 
-    private static long SignExtend(uint value, int bits) => ((long)(value << (32 - bits))) >> (32 - bits);
+    private static long SignExtend(uint value, int bits) => unchecked((int)(value << (32 - bits))) >> (32 - bits);
     private static uint U32(byte[] data, int offset) => BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset, 4));
 }
