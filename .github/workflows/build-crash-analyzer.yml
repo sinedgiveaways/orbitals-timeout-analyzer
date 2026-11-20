@@ -1,0 +1,49 @@
+name: Build Orbitals Crash Analyzer (Windows)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crash-analyzer/**'
+      - '.github/workflows/build-crash-analyzer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore crash-analyzer/OrbitalsCrashAnalyzer/OrbitalsCrashAnalyzer.csproj
+
+      - name: Build
+        run: dotnet build crash-analyzer/OrbitalsCrashAnalyzer/OrbitalsCrashAnalyzer.csproj --configuration Release --no-restore
+
+      - name: Publish standalone Windows executable
+        run: dotnet publish crash-analyzer/OrbitalsCrashAnalyzer/OrbitalsCrashAnalyzer.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true --output artifacts/OrbitalsCrashAnalyzer
+
+      - name: Verify executable
+        shell: pwsh
+        run: |
+          $exe = "artifacts/OrbitalsCrashAnalyzer/OrbitalsCrashAnalyzer.exe"
+          if (-not (Test-Path $exe)) { throw "Executable not found: $exe" }
+          Write-Host "Executable generated: $((Get-Item $exe).Length) bytes"
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrbitalsCrashAnalyzer-win-x64
+          path: artifacts/OrbitalsCrashAnalyzer/
+          if-no-files-found: error
+          retention-days: 30
