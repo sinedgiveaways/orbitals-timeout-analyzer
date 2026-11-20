@@ -17,12 +17,12 @@ internal static class Program
         var path = (Console.ReadLine() ?? "").Trim().Trim('"');
         if (!File.Exists(path)) { Console.WriteLine("Fichier introuvable."); return 2; }
 
-        Console.Write("Offset cible dans le module (défaut 0x16B6D0) : ");
+        Console.Write("Offset cible dans le module (défaut 0x16B730) : ");
         var offsetText = (Console.ReadLine() ?? "").Trim();
         if (string.IsNullOrWhiteSpace(offsetText)) offsetText = "0x16B730";
         if (!TryHex(offsetText, out ulong target)) { Console.WriteLine("Offset invalide."); return 2; }
 
-        Console.Write("Nombre d'octets avant/après (défaut 0x80) : ");
+        Console.Write("Nombre d'octets de chaque côté (défaut 0x60) : ");
         var spanText = (Console.ReadLine() ?? "").Trim();
         if (string.IsNullOrWhiteSpace(spanText)) spanText = "0x60";
         if (!TryHex(spanText, out ulong span) || span > 0x1000) { Console.WriteLine("Plage invalide (maximum 0x1000)."); return 2; }
@@ -141,7 +141,7 @@ internal static class Program
         if ((x & 0xFC000000) == 0x14000000) return $"B 0x{(long)pc + Sign(x & 0x03FFFFFF, 26) * 4:X}";
         if ((x & 0x9F000000) == 0x90000000)
         {
-            long imm = Sign((((long)(x >> 5) & 0x7FFFF) << 2) | ((x >> 29) & 3), 21) << 12;
+            long imm = Sign((uint)((((long)(x >> 5) & 0x7FFFF) << 2) | ((x >> 29) & 3)), 21) << 12;
             return $"ADRP X{rd}, 0x{(((long)pc & ~0xFFF) + imm):X}";
         }
         if ((x & 0x7F000000) == 0x11000000)
