@@ -19,12 +19,12 @@ internal static class Program
 
         Console.Write("Offset cible dans le module (défaut 0x16B6D0) : ");
         var offsetText = (Console.ReadLine() ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(offsetText)) offsetText = "0x16B6D0";
+        if (string.IsNullOrWhiteSpace(offsetText)) offsetText = "0x16B730";
         if (!TryHex(offsetText, out ulong target)) { Console.WriteLine("Offset invalide."); return 2; }
 
         Console.Write("Nombre d'octets avant/après (défaut 0x80) : ");
         var spanText = (Console.ReadLine() ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(spanText)) spanText = "0x80";
+        if (string.IsNullOrWhiteSpace(spanText)) spanText = "0x60";
         if (!TryHex(spanText, out ulong span) || span > 0x1000) { Console.WriteLine("Plage invalide (maximum 0x1000)."); return 2; }
 
         try
