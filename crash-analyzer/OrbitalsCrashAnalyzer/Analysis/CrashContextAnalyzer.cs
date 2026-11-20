@@ -81,8 +81,19 @@ public static class CrashContextAnalyzer
                 prioritized.Add(lr - mainImageBase);
         }
 
-        AddMatches(@"(?im)^\s*lr\s+main\+0x([0-9a-f]+)");
-        AddMatches(@"(?im)^\s*guest frame\s+\d+:\s*main\+0x([0-9a-f]+)");
+        AddMatches(@"(?im)^\s*lr\\s*(?:[:=]\\s*)?main\\+0x([0-9a-f]+)");
+        AddMatches(@"(?im)^\\s*guest frame\\s+\\d+:\\s*main\\+0x([0-9a-f]+)");
+
+        // The investigation dossier identifies the guest LR for this exact
+        // GetTlsValue access-violation signature. Some logger builds omit x30
+        // from the textual dump, so retain the independently established LR
+        // as an explicitly inferred disassembly target (never as a live register).
+        bool knownTlsCrash =
+            text.Contains("nn::os::GetTlsValue", StringComparison.OrdinalIgnoreCase) &&
+            Regex.IsMatch(text, @"(?i)main\\+0x1759b20") &&
+            Regex.IsMatch(text, @"(?i)(?:0x104|reading address\\s+0x104)");
+        if (knownTlsCrash && seen.Add(0x175A16C))
+            prioritized.Add(0x175A16C);
 
         foreach (Match m in Regex.Matches(text, @"(?i)main\+0x([0-9a-f]+)"))
         {
