@@ -19,6 +19,9 @@ public static class LogAnalyzer
     public static string Analyze(string path)
     {
         var text = File.ReadAllText(path);
+        // Older logger builds concatenate the TPIDR trace banner to the fatal exception line.
+        // Split it before signature scanning so the exception is not polluted by trace metadata.
+        text = Regex.Replace(text, @"(?i)(?<!\\r?\\n)FATAL:\\s*TPIDR trace", Environment.NewLine + "FATAL: TPIDR trace");
         var lines = text.Replace("\r", "").Split('\n');
         var output = new StringBuilder();
         output.AppendLine($"[LOG] {path}");
