@@ -1,7 +1,7 @@
 name: Build Orbitals TLS Crash Probe (Windows)
 on:
   push:
-    branches: [tls-crash-probe]
+    branches: [main, tls-crash-probe]
     paths:
       - 'crash-probe/**'
       - '.github/workflows/build-tls-crash-probe.yml'
