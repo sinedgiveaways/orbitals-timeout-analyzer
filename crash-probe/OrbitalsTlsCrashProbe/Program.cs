@@ -103,9 +103,12 @@ internal static class Program
         if (b.Length < 0x100) throw new InvalidDataException("En-tête NSO tronqué.");
         uint flags = U32(b, 0x0C);
         var result = new List<Section>();
-        Add("TEXT", 0x10, 0x18, 0x20, 0x60, 1);
-        Add("RODATA", 0x28, 0x30, 0x38, 0x64, 2);
-        Add("DATA", 0x40, 0x48, 0x50, 0x68, 4);
+        // NSO segment descriptors are 0x10 bytes apart:
+        // file offset, memory offset, decompressed size, reserved.
+        // Compressed sizes are stored separately at 0x60, 0x64 and 0x68.
+        Add("TEXT", 0x10, 0x18, 0x14, 0x60, 1);
+        Add("RODATA", 0x20, 0x28, 0x24, 0x64, 2);
+        Add("DATA", 0x30, 0x38, 0x34, 0x68, 4);
         return result;
 
         void Add(string name, int filePos, int sizePos, int memPos, int compSizePos, int bit)
