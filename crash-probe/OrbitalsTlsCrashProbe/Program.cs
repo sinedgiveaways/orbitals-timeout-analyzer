@@ -4,7 +4,7 @@ using K4os.Compression.LZ4;
 
 internal static class Program
 {
-    private sealed record Section(string Name, uint FileOffset, uint DecompressedSize, uint MemoryOffset, bool Compressed);
+    private sealed record Section(string Name, uint FileOffset, uint CompressedSize, uint DecompressedSize, uint MemoryOffset, bool Compressed);
 
     static int Main()
     {
@@ -103,26 +103,28 @@ internal static class Program
         if (b.Length < 0x100) throw new InvalidDataException("En-tête NSO tronqué.");
         uint flags = U32(b, 0x0C);
         var result = new List<Section>();
-        Add("TEXT", 0x10, 0x18, 0x20, 1);
-        Add("RODATA", 0x28, 0x30, 0x38, 2);
-        Add("DATA", 0x40, 0x48, 0x50, 4);
+        Add("TEXT", 0x10, 0x18, 0x20, 0x60, 1);
+        Add("RODATA", 0x28, 0x30, 0x38, 0x64, 2);
+        Add("DATA", 0x40, 0x48, 0x50, 0x68, 4);
         return result;
 
-        void Add(string name, int filePos, int sizePos, int memPos, int bit)
+        void Add(string name, int filePos, int sizePos, int memPos, int compSizePos, int bit)
         {
-            uint off = U32(b, filePos), size = U32(b, sizePos), mem = U32(b, memPos);
-            if ((ulong)off + size > (ulong)b.Length) throw new InvalidDataException($"Section {name} dépasse le fichier.");
-            result.Add(new Section(name, off, size, mem, (flags & bit) != 0));
+            uint off = U32(b, filePos), size = U32(b, sizePos), mem = U32(b, memPos), compSize = U32(b, compSizePos);
+            uint stored = (flags & bit) != 0 ? compSize : size;
+            if ((ulong)off + stored > (ulong)b.Length) throw new InvalidDataException($"Section {name} dépasse le fichier.");
+            result.Add(new Section(name, off, stored, size, mem, (flags & bit) != 0));
         }
     }
 
     private static byte[] ExtractSection(byte[] file, Section s)
     {
-        var src = file.AsSpan((int)s.FileOffset, (int)s.DecompressedSize).ToArray();
+        var src = file.AsSpan((int)s.FileOffset, (int)s.CompressedSize).ToArray();
         if (!s.Compressed) return src;
-        // NSO stores compressed size at the section's file-offset field + 4 in the module header.
-        // The caller's Section uses the header's stored file size separately in normal NSO layouts.
-        throw new InvalidDataException("Section NSO compressée détectée. Cette version attend un SDK décompressé ou un NSO non compressé; fournis le fichier extrait si le NSO est compressé.");
+        var dst = new byte[checked((int)s.DecompressedSize)];
+        int decoded = LZ4Codec.Decode(src, 0, src.Length, dst, 0, dst.Length);
+        if (decoded != dst.Length) throw new InvalidDataException($"Décompression LZ4 {s.Name} incomplète : {decoded}/{dst.Length} octets.");
+        return dst;
     }
 
     private static uint U32(byte[] b, int p) => BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(p, 4));
