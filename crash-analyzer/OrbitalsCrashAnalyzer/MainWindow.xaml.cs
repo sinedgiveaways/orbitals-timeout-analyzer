@@ -52,8 +52,10 @@ public partial class MainWindow : Window
         {
             var report = new StringBuilder();
             report.AppendLine("ORBITALS CRASH ANALYZER — RAPPORT");
-            report.AppendLine($"Date d'analyse : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            report.AppendLine($"Version : 0.2.0 | Date : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             report.AppendLine(new string('=', 78));
+            string logText = _logPath is not null ? File.ReadAllText(_logPath) : "";
+            var mainOffsets = CrashContextAnalyzer.FindMainOffsets(logText);
             if (_logPath is not null)
             {
                 report.AppendLine();
@@ -63,11 +65,11 @@ public partial class MainWindow : Window
             if (_nsoPath is not null)
             {
                 report.AppendLine();
-                report.AppendLine(NsoAnalyzer.Analyze(_nsoPath));
+                report.AppendLine(NsoAnalyzer.Analyze(_nsoPath, mainOffsets));
             }
-            else report.AppendLine("\n[NSO] Aucun binaire chargé.");
+            else report.AppendLine("\n[NSO] Aucun binaire chargé. Charge exefs\\main pour obtenir les fenêtres ARM64 des frames main+0x.");
             report.AppendLine();
-            report.AppendLine("NOTE : les correspondances sont des indices statiques, pas une preuve de causalité.");
+            report.AppendLine("NOTE : les fenêtres ARM64 décodent les branches courantes, pas toutes les instructions. Elles ne remplacent pas Capstone/IDA/Ghidra et ne prouvent pas la cause racine.");
             _lastReport = report.ToString();
             ReportBox.Text = _lastReport;
         }

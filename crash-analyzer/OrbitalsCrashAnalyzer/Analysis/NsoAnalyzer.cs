@@ -9,7 +9,7 @@ public static class NsoAnalyzer
 {
     private sealed record Segment(string Name, uint FileOffset, uint MemoryOffset, uint FileSize, uint MemorySize, bool Compressed, byte[] Data);
 
-    public static string Analyze(string path)
+    public static string Analyze(string path, IEnumerable<ulong>? interestingOffsets = null)
     {
         var file = File.ReadAllBytes(path);
         if (file.Length < 0x30 || Encoding.ASCII.GetString(file, 0, 4) != "NSO0")
@@ -77,10 +77,51 @@ public static class NsoAnalyzer
             }
             output.AppendLine($"  {marker.Name} : {(locations.Count == 0 ? "non trouvé" : string.Join("; ", locations))}");
         }
+
+        var offsets = (interestingOffsets ?? []).Distinct().OrderBy(x => x).Take(32).ToArray();
+        if (offsets.Length > 0)
+        {
+            output.AppendLine();
+            output.AppendLine("[FENÊTRES ARM64 — ADRESSES main+0x EXTRAITES DU LOG]");
+            output.AppendLine("Dump des mots 32 bits et décodage des branches usuelles. Ce n'est pas un désassembleur complet.");
+            foreach (var address in offsets)
+            {
+                var seg = segments.FirstOrDefault(s => address >= s.MemoryOffset && address + 4 <= (ulong)s.MemoryOffset + s.Data.Length);
+                if (seg is null) { output.AppendLine($"main+0x{address:X} : hors des segments chargés."); continue; }
+                int at = checked((int)(address - seg.MemoryOffset));
+                output.AppendLine();
+                output.AppendLine($"-- {seg.Name} autour de main+0x{address:X} --");
+                int start = Math.Max(0, at - 16 * 4);
+                int end = Math.Min(seg.Data.Length - 4, at + 8 * 4);
+                start &= ~3;
+                for (int p = start; p <= end; p += 4)
+                {
+                    uint word = U32(seg.Data, p);
+                    ulong pc = (ulong)seg.MemoryOffset + (uint)p;
+                    output.AppendLine($"{(p == at ? ">>" : "  ")} main+0x{pc:X}: {word:X8}  {Decode(word, pc)}");
+                }
+            }
+        }
         output.AppendLine();
-        output.AppendLine("Cette recherche est une recherche d'octets bruts : une valeur peut apparaître comme donnée, instruction ou constante sans être utilisée à l'exécution.");
+        output.AppendLine("Cette recherche de marqueurs est une recherche d'octets bruts : une valeur trouvée peut être une donnée ou une constante. Les fenêtres ARM64 sont limitées aux offsets main+0x du log.");
         return output.ToString();
     }
 
+    private static string Decode(uint w, ulong pc)
+    {
+        if ((w & 0xFC000000) == 0x94000000) return $"BL 0x{unchecked((long)pc + SignExtend(w & 0x03FFFFFF, 26) * 4):X}";
+        if ((w & 0xFC000000) == 0x14000000) return $"B 0x{unchecked((long)pc + SignExtend(w & 0x03FFFFFF, 26) * 4):X}";
+        if ((w & 0xFFFFFC1F) == 0xD63F0000) return $"BLR X{(w >> 5) & 31}";
+        if ((w & 0xFFFFFC1F) == 0xD61F0000) return $"BR X{(w >> 5) & 31}";
+        if ((w & 0xFFFFFC1F) == 0xD65F0000) return $"RET X{(w >> 5) & 31}";
+        if ((w & 0x9F000000) == 0x90000000) return "ADRP (adresse de page)";
+        if ((w & 0x7F000000) == 0x11000000) return "ADD/SUB immédiat";
+        if ((w & 0x3B000000) == 0x39000000) return "LDR/STR unsigned offset";
+        if ((w & 0x7F200000) == 0x0B000000) return "ADD/SUB registre";
+        if ((w & 0x7F000000) == 0x51000000) return "SUB immédiat";
+        return "instruction ARM64 (décodage non implémenté)";
+    }
+
+    private static long SignExtend(uint value, int bits) => ((long)(value << (32 - bits))) >> (32 - bits);
     private static uint U32(byte[] data, int offset) => BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset, 4));
 }

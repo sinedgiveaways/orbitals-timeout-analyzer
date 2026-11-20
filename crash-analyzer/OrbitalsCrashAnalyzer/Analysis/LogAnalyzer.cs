@@ -42,6 +42,8 @@ public static class LogAnalyzer
         output.AppendLine();
         output.AppendLine($"Adresses hexadécimales candidates : {addresses.Length}");
         output.AppendLine(string.Join(", ", addresses));
+        output.AppendLine();
+        output.AppendLine(CrashContextAnalyzer.Analyze(text));
         return output.ToString();
     }
 }
