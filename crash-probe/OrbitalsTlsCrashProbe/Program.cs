@@ -131,28 +131,48 @@ internal static class Program
 
     private static string Decode(uint x, ulong pc)
     {
-        uint rd=x&31, rn=(x>>5)&31, rm=(x>>16)&31;
+        uint rd = x & 31, rn = (x >> 5) & 31, rm = (x >> 16) & 31;
+        bool is64 = (x >> 31) != 0;
+        string reg = is64 ? "X" : "W";
+
         if (x == 0xD503237F) return "PACIBSP";
         if (x == 0xD503233F) return "PACIASP";
-        if ((x & 0xFC000000) == 0x94000000) return $"BL 0x{(long)pc + Sign(x & 0x03FFFFFF,26)*4:X}";
-        if ((x & 0xFC000000) == 0x14000000) return $"B 0x{(long)pc + Sign(x & 0x03FFFFFF,26)*4:X}";
+        if ((x & 0xFC000000) == 0x94000000) return $"BL 0x{(long)pc + Sign(x & 0x03FFFFFF, 26) * 4:X}";
+        if ((x & 0xFC000000) == 0x14000000) return $"B 0x{(long)pc + Sign(x & 0x03FFFFFF, 26) * 4:X}";
         if ((x & 0x9F000000) == 0x90000000)
         {
-            long imm = Sign((((long)(x>>5)&0x7FFFF)<<2) | ((x>>29)&3),21) << 12;
-            return $"ADRP X{rd}, 0x{((long)pc & ~0xFFF)+imm:X}";
+            long imm = Sign((((long)(x >> 5) & 0x7FFFF) << 2) | ((x >> 29) & 3), 21) << 12;
+            return $"ADRP X{rd}, 0x{(((long)pc & ~0xFFF) + imm):X}";
         }
-        if ((x & 0x7F000000) == 0x11000000) return $"ADD{((x>>31)!=0?"S":"")} {(x>>31)!=0?"W":"X"}{rd}, {(x>>31)!=0?"W":"X"}{rn}, #0x{(((x>>10)&0xFFF) << (((x>>22)&1)!=0?12:0)):X}";
-        if ((x & 0x7F200000) == 0x0B000000) return $"ADD {(x>>31)!=0?"X":"W"}{rd}, {(x>>31)!=0?"X":"W"}{rn}, {(x>>31)!=0?"X":"W"}{rm}";
-        if ((x & 0xFFC00000) == 0xF9400000) return $"LDR X{rd}, [X{rn}, #0x{((x>>10)&0xFFF)*8:X}]";
-        if ((x & 0xFFC00000) == 0xB9400000) return $"LDR W{rd}, [X{rn}, #0x{((x>>10)&0xFFF)*4:X}]";
-        if ((x & 0xFFC00000) == 0xF9000000) return $"STR X{rd}, [X{rn}, #0x{((x>>10)&0xFFF)*8:X}]";
-        if ((x & 0xFFC00000) == 0xB9000000) return $"STR W{rd}, [X{rn}, #0x{((x>>10)&0xFFF)*4:X}]";
+        if ((x & 0x7F000000) == 0x11000000)
+        {
+            bool setFlags = (x & 0x20000000) != 0;
+            string op = setFlags ? "ADDS" : "ADD";
+            string width = is64 ? "X" : "W";
+            uint imm = ((x >> 10) & 0xFFF) << (((x >> 22) & 1) != 0 ? 12 : 0);
+            return $"{op} {width}{rd}, {width}{rn}, #0x{imm:X}";
+        }
+        if ((x & 0x7F200000) == 0x0B000000)
+            return $"ADD {reg}{rd}, {reg}{rn}, {reg}{rm}";
+        if ((x & 0xFFC00000) == 0xF9400000) return $"LDR X{rd}, [X{rn}, #0x{((x >> 10) & 0xFFF) * 8:X}]";
+        if ((x & 0xFFC00000) == 0xB9400000) return $"LDR W{rd}, [X{rn}, #0x{((x >> 10) & 0xFFF) * 4:X}]";
+        if ((x & 0xFFC00000) == 0xF9000000) return $"STR X{rd}, [X{rn}, #0x{((x >> 10) & 0xFFF) * 8:X}]";
+        if ((x & 0xFFC00000) == 0xB9000000) return $"STR W{rd}, [X{rn}, #0x{((x >> 10) & 0xFFF) * 4:X}]";
         if ((x & 0xFFE0FC00) == 0xAA0003E0) return $"MOV X{rd}, X{rm}";
         if ((x & 0x7FE0FC00) == 0x2A0003E0) return $"MOV W{rd}, W{rm}";
-        if ((x & 0x7F000000) == 0x34000000) return $"{((x>>24)&1)==0?"CBZ":"CBNZ"} {(x>>31)!=0?"X":"W"}{rd}, 0x{(long)pc+Sign((x>>5)&0x7FFFF,19)*4:X}";
-        if ((x & 0x7E000000) == 0x36000000) return $"{((x>>24)&1)==0?"TBZ":"TBNZ"} {(x>>31)!=0?"X":"W"}{rd}, #{((x>>19)&0x1F)|((x>>26)&0x20)}, 0x{(long)pc+Sign((x>>5)&0x3FFF,14)*4:X}";
-        if ((x & 0x7F000000) == 0x71000000) return $"CMP W{rn}, #0x{(x>>10)&0xFFF:X}";
-        if ((x & 0x7F000000) == 0xF1000000) return $"CMP X{rn}, #0x{(x>>10)&0xFFF:X}";
+        if ((x & 0x7F000000) == 0x34000000)
+        {
+            string op = ((x >> 24) & 1) == 0 ? "CBZ" : "CBNZ";
+            return $"{op} {reg}{rd}, 0x{(long)pc + Sign((x >> 5) & 0x7FFFF, 19) * 4:X}";
+        }
+        if ((x & 0x7E000000) == 0x36000000)
+        {
+            string op = ((x >> 24) & 1) == 0 ? "TBZ" : "TBNZ";
+            uint bit = ((x >> 19) & 0x1F) | ((x >> 26) & 0x20);
+            return $"{op} {reg}{rd}, #{bit}, 0x{(long)pc + Sign((x >> 5) & 0x3FFF, 14) * 4:X}";
+        }
+        if ((x & 0x7F000000) == 0x71000000) return $"CMP W{rn}, #0x{(x >> 10) & 0xFFF:X}";
+        if ((x & 0x7F000000) == 0xF1000000) return $"CMP X{rn}, #0x{(x >> 10) & 0xFFF:X}";
         if ((x & 0xFFFFFC1F) == 0xD65F0000) return $"RET X{rn}";
         if ((x & 0xFFC003E0) == 0xA94003E0) return $"LDP X{rd}, X{rm}, [X{rn}]";
         if ((x & 0xFFC003E0) == 0xA90003E0) return $"STP X{rd}, X{rm}, [X{rn}]";
