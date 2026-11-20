@@ -68,7 +68,7 @@ public static class CrashContextAnalyzer
         }
 
         var threadContext = Regex.Match(text,
-            @"(?im)guest thread=(?<thread>0x[0-9a-f]+)\s+TPIDR_EL0=(?<tpidr>0x[0-9a-f]+)\s+TLR=(?<tlr>0x[0-9a-f]+)");
+            @"(?im)guest thread=(?<thread>(?:0x)?[0-9a-f]+)\s+TPIDR_EL0=(?<tpidr>0x[0-9a-f]+)\s+TLR=(?<tlr>0x[0-9a-f]+)");
         var currentThread = Regex.Match(text,
             @"(?im)TLR\[\+0x(?<offset>[0-9a-f]+)\]\s+current-thread object=(?<object>0x[0-9a-f]+)");
         if (threadContext.Success && currentThread.Success)
