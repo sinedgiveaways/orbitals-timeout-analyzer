@@ -68,7 +68,19 @@ public static class CrashContextAnalyzer
         }
 
         AddMatches(@"(?im)^\s*in lifted function\s+.*?main\+0x([0-9a-f]+)");
-        AddMatches(@"(?im)^\s*x30\s+.*?main\+0x([0-9a-f]+)");
+
+        // Some crash logs print LR as an absolute guest address in main's
+        // 0x7000000000 mapping instead of the symbolic main+0x form.
+        const ulong mainImageBase = 0x7000000000;
+        const ulong mainTextSize = 0x70C5B20;
+        foreach (Match m in Regex.Matches(text, @"(?im)^\s*x30\s+(?:0x)?([0-9a-f]{8,16})\b"))
+        {
+            if (ulong.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.HexNumber, null, out var lr)
+                && lr >= mainImageBase && lr - mainImageBase < mainTextSize
+                && seen.Add(lr - mainImageBase))
+                prioritized.Add(lr - mainImageBase);
+        }
+
         AddMatches(@"(?im)^\s*lr\s+main\+0x([0-9a-f]+)");
         AddMatches(@"(?im)^\s*guest frame\s+\d+:\s*main\+0x([0-9a-f]+)");
 
