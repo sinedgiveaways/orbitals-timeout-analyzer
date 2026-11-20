@@ -50,12 +50,35 @@ public static class CrashContextAnalyzer
         return output.ToString();
     }
 
+    // Put the actual crash site and unwind frames first. The NSO analyzer consumes
+    // this ordered list and has a bounded number of disassembly windows.
     public static IReadOnlyList<ulong> FindMainOffsets(string text)
     {
-        var offsets = new HashSet<ulong>();
+        var prioritized = new List<ulong>();
+        var seen = new HashSet<ulong>();
+
+        void AddMatches(string pattern)
+        {
+            foreach (Match m in Regex.Matches(text, pattern))
+            {
+                if (ulong.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.HexNumber, null, out var value)
+                    && seen.Add(value))
+                    prioritized.Add(value);
+            }
+        }
+
+        AddMatches(@"(?im)^\s*in lifted function\s+.*?main\+0x([0-9a-f]+)");
+        AddMatches(@"(?im)^\s*x30\s+.*?main\+0x([0-9a-f]+)");
+        AddMatches(@"(?im)^\s*lr\s+main\+0x([0-9a-f]+)");
+        AddMatches(@"(?im)^\s*guest frame\s+\d+:\s*main\+0x([0-9a-f]+)");
+
         foreach (Match m in Regex.Matches(text, @"(?i)main\+0x([0-9a-f]+)"))
-            if (ulong.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.HexNumber, null, out var value))
-                offsets.Add(value);
-        return offsets.OrderBy(x => x).ToArray();
+        {
+            if (ulong.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.HexNumber, null, out var value)
+                && seen.Add(value))
+                prioritized.Add(value);
+        }
+
+        return prioritized;
     }
 }
