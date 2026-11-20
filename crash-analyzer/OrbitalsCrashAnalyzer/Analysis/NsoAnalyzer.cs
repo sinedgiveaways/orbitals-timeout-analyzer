@@ -86,7 +86,7 @@ public static class NsoAnalyzer
             output.AppendLine("Dump des mots 32 bits et décodage des branches usuelles. Ce n'est pas un désassembleur complet.");
             foreach (var address in offsets)
             {
-                var seg = segments.FirstOrDefault(s => address >= s.MemoryOffset && address + 4UL <= (ulong)s.MemoryOffset + s.Data.Length);
+                var seg = segments.FirstOrDefault(s => address >= s.MemoryOffset && address + 4UL <= (ulong)s.MemoryOffset + (ulong)s.Data.Length);
                 if (seg is null) { output.AppendLine($"main+0x{address:X} : hors des segments chargés."); continue; }
                 int at = checked((int)(address - seg.MemoryOffset));
                 output.AppendLine();
