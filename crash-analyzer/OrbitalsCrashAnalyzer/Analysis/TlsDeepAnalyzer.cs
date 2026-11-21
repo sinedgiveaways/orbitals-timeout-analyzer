@@ -244,7 +244,7 @@ public static class TlsDeepAnalyzer
         {
             ulong imm = (w >> 10) & 0xFFF; if ((w & (1u<<22)) != 0) imm <<= 12;
             bool sub = (w & (1u<<30)) != 0, flags = (w & (1u<<29)) != 0;
-            return $"{(sub?"SUB":"ADD")}{(flags?"S":"")} {(w&(1u<<31))!=0?R(rd,false):R(rd)}, {(w&(1u<<31))!=0?R(rn,false):R(rn)}, #0x{imm:X}";
+            return $"{(sub ? "SUB" : "ADD")}{(flags ? "S" : "")} {((w & (1u << 31)) != 0 ? R(rd, false) : R(rd))}, {((w & (1u << 31)) != 0 ? R(rn, false) : R(rn))}, #0x{imm:X}";
         }
         if ((w & 0x7F800000) == 0x52800000) return $"MOVZ {R(rd,(w&(1u<<31))!=0)}, #0x{(w>>5)&0xFFFF:X}, LSL #{((w>>21)&3)*16}";
         if ((w & 0x7F800000) == 0x72800000) return $"MOVK {R(rd,(w&(1u<<31))!=0)}, #0x{(w>>5)&0xFFFF:X}, LSL #{((w>>21)&3)*16}";
