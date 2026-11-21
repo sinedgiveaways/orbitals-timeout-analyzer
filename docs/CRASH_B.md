@@ -463,3 +463,14 @@ Les six écritures QWORD doivent être archivées individuellement, pas seulemen
 - Le rapport reçu précise aussi des rechargements de `[rsi+0xD0]` et `[rsi+0xD8]` dans ce voisinage.
 
 Ces lignes montrent que `main_main_0156.o` manipule un enregistrement basé sur `r15+rbx`, lit son octet `+0xD8`, et utilise plusieurs valeurs provenant de `[rsi+0x230]`. Elles ne prouvent pas que cet enregistrement est celui sélectionné dans `main_main_0184.o`, ni que l'un des six stores initialise le premier QWORD de l'enregistrement extérieur. En particulier, aucun des six stores n'écrit à displacement `+0`.
+
+
+## Complément retrouvé dans les échanges — pointeur du TlsManager (21-11-2026)
+
+Un échange antérieur précise que le wrapper TLS calcule le pointeur du gestionnaire par double opération : lecture du global à `sdk+0xE6E010`, puis ajout de `0x310` (forme rapportée : `[0xE6E010] + 0x310`). Le scan de références globales / constructeurs communiqué ensuite n'a retourné aucune correspondance. Une réserve a été formulée sur le script de scan : `md.disasm` pouvait s'arrêter prématurément ; un scan instruction-par-instruction sur 4 octets dans SDK et MAIN a été proposé, mais aucun résultat de ce scan de suivi n'est conservé dans les éléments consultables.
+
+**Interprétation :** l'absence de correspondance dans le premier scan ne prouve pas l'absence d'initialisation. Le zéro observé dans l'image décompressée à `sdk+0xE6E010` n'établit pas non plus que le pointeur soit nul à l'exécution. Le lien entre ce gestionnaire et la lecture fautive `0x104` reste à démontrer.
+
+### Paramètres de comparaison rapportés pour GetTlsValue
+
+Un précédent cadrage d'analyse demandait de comparer l'entrée réelle de `sdk+0x16B730` avec `RCX=0`, `R8=0xA8`, `TPIDR_EL0=0xA2003C740` et `TLR=0x7010078000`. Ces valeurs étaient des paramètres / points de comparaison attendus pour l'analyse, pas une capture simultanée prouvant que tous ces registres avaient ces valeurs au PC du crash. La capture existante du TLS contient bien TPIDR_EL0 et TLR, mais pas une capture complète synchronisée de tous les registres à l'entrée effective de GetTlsValue et au site hôte fautif.
