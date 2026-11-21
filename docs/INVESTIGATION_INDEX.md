@@ -55,3 +55,14 @@ Le mécanisme est compatible avec un premier qword nul dans l'élément sélecti
 ## Limite de cette sauvegarde
 
 Ce dossier consolide les faits, extraits et conclusions disponibles dans le contexte de travail au moment de sa rédaction. Il ne prétend pas archiver les fichiers de logs binaires complets ni chaque sortie PowerShell historique. Les logs originaux doivent être conservés séparément si l'on veut pouvoir reproduire chaque constat ligne par ligne.
+
+
+## Compléments SDK TLS ajoutés — 21-11-2026
+
+Le dossier [CRASH_B.md](CRASH_B.md) a été complété avec les derniers résultats confirmés :
+- appel d'initialisation de `nn::os::AllocateTlsSlot` via GOT `0x900A1C8), avec premier argument `0x90100F8) et callback `main+0x1A820) ;
+- relocation type `1026` (`0x402`), addend nul, et nom manglé de l'import ;
+- relocation/export de `SearchUnusedTlsSlotUnsafe` à `sdk+0x16C520), taille `0x284`, recherche de slots `0..31` ;
+- points d'entrée SDK étudiés pour allocation TLS, mise à zéro des TLS de threads et création de threads, avec indication explicite des extraits partiels.
+
+Ces éléments ne déterminent pas encore la cause racine. Les priorités restent la capture runtime du slot TLS avant/après allocation et l'identification des écrivains du premier qword des éléments de stride `0xE8). Aucun rebuild complet n'est requis pour ces analyses.
