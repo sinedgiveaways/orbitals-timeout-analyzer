@@ -110,3 +110,23 @@ L'examen des six objets / 12 candidats 0xE8 est déjà terminé selon l'utilisat
 Le bloc consommateur hôte à main_main_0184.o+.text+0x1952F effectue une consultation avec stride 0x38. Les recherches d'écritures stride 0xE8 concernent une autre piste et ne doivent pas être présentées comme l'origine établie du pointeur fautif. Le QWORD Hunter six objets est déjà terminé ; ne pas le relancer. Les détails et le tableau sont dans docs/CRASH_B_POINTER_PROVENANCE.md.
 
 Des occurrences globales de [rsi+0xD8] dans les chunks reçus montrent des usages de slot/pointeur/cursor et même d'offset DWORD signé dans une autre fonction ; il ne faut pas lui attribuer une sémantique universelle hors de la fonction concernée. Les chunks conservés vont jusqu'à 0x4CC32, sans marqueur de fin de rapport confirmé.
+
+
+## Détails complets du dernier log NVN/runtime communiqué — 21-11-2026
+
+Le log décrit les probes de fichiers sous les familles `rom:/Engine/.../Nintendo/...`, `rom:/Engine/.../Switch2/...` et `rom:/Orbitals/...`. Les probes `Hardware.ini` et `GameplayTags.ini` listées renvoient `0x202`.
+
+Variables/options observées dans la session NVN replay :
+- `ORBITALS_REPLAY_ASYNC=1` ;
+- `ORBITALS_REPORT_AT_SUBMIT=1` ;
+- `ORBITALS_QUEUE_WAITS` désactivé / census seulement ;
+- `ORBITALS_SUBMIT_CATCHUP` ;
+- `ORBITALS_REPORT_GPU_END` ;
+- thread Vulkan recorder ;
+- texture aliases activés ;
+- DCC désactivé ;
+- staging pool de 2 × 64 MiB conservé ;
+- allocation headroom type-1 de 256 MiB (3 observées à ce stade) ;
+- 11 allocations d'au moins 32 MiB observées sur d'autres threads.
+
+Appels NVN relevés : `nvnQueueSubmitCommands`, `nvnQueueFlush` et `nvnSyncWait`. Le runtime utilise `ORBITALS_VK_PRESENT=mailbox`. Le log montre une fenêtre noire avec audio audible. Ces détails sont conservés comme observations de runtime et ne sont pas attribués causalement à Crash B.
