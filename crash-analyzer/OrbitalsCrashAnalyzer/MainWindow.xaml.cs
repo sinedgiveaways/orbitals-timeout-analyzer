@@ -80,8 +80,8 @@ public partial class MainWindow : Window
             else
                 report.AppendLine("\n[LOG] Aucun log relu : le profil ci-dessus reprend les résultats déjà établis. Ajouter un log uniquement pour examiner un nouvel événement ou vérifier un changement.");
 
-            var mainOffsets = CrashContextAnalyzer.FindMainOffsets(logText);
-            var sdkOffsets = FindSdkOffsets(logText);
+            var mainOffsets = CrashContextAnalyzer.FindMainOffsets(logText).ToList();
+            var sdkOffsets = FindSdkOffsets(logText).ToList();
             foreach (ulong v in new ulong[] { 0x1759B20, 0x175A16C, 0x1750B88, 0x1750650, 0x1718CF8, 0x1D77D64, 0x1D761E0, 0x1641F84 })
                 if (!mainOffsets.Contains(v)) mainOffsets.Add(v);
             foreach (ulong v in new ulong[] { 0x16B670, 0x16B730, 0x16C520, 0x16C7B0, 0x16CC30 })
