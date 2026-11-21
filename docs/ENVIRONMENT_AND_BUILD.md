@@ -141,3 +141,12 @@ Avant la branche d'analyseur 0.4.x–0.5.2 documentée ci-dessus, les échanges 
 - un probe C# `OrbitalsTlsCrashProbe` dont un correctif de syntaxe/interpolation a été associé au commit `ab4107c`, mais les six erreurs restantes n'ont pas été confirmées comme résolues dans l'historique consultable.
 
 Ces mentions retracent les annonces et limites des versions de travail ; elles ne certifient pas à elles seules que chaque binaire a été compilé, testé ou distribué. Ne pas confondre ces anciennes versions 0.2.0/0.3.0 avec les versions 0.4.0–0.5.2 du suivi actuel, ni présenter le probe comme validé.
+
+
+## Audit des artefacts Windows — vérification GitHub Actions du 21-11-2026
+
+- **Orbitals Crash Analyzer WPF** : run `44867261298`, succès, commit `b5c72fac2bf1a5c59a83ce8b2da5fa1d377773f6`, artifact `OrbitalsCrashAnalyzer-win-x64` ID `14691748393`, taille 59,409,094 octets, non expiré au contrôle (expiration `2026-12-21T04:41:31Z`). C'est un build 0.5.2 déjà existant, pas un build déclenché par les derniers commits de documentation.
+- **Crash B Pointer Provenance + fallback report generator** : run `44951389432`, succès, commit `b9486a273e35a0b1b87857f183e1f366ba0cbd48`, artifact `Orbitals_CrashB_Analysis_Tools_Windows` ID `14726090607`, taille 24,905,547 octets, non expiré au contrôle (expiration `2026-12-21T21:25:25Z`).
+- **Crash B QWORD Writer Hunter** : run `44941325433`, succès, commit `0634c2905f457d09d9280bc657fc318c7155e9d9`, artifact `Orbitals_CrashB_QWORD_Hunter_Windows` ID `14721153910`, taille 12,454,478 octets, non expiré au contrôle (expiration `2026-12-21T19:31:35Z`).
+
+Les jobs et artifacts de ces trois runs ont été relus sur GitHub. Les derniers commits de cette séquence sont des modifications documentaires ; aucun nouveau build de l'analyseur principal n'a été déclenché après eux. Ne pas présenter un artifact existant comme compilé depuis le dernier commit documentaire.
