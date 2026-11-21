@@ -115,3 +115,21 @@ Le rapport utilisateur identifie six stores QWORD dans `main_main_0156.o` : `[r1
 - Le wrapper TLS a été décrit comme calculant le manager depuis le global `sdk+0xE6E010`, puis `+0x310`. Le premier scan global/constructeur n'a rien trouvé ; un scan de suivi instruction-par-instruction sur 4 octets a été proposé après une réserve sur l'arrêt anticipé possible de `md.disasm`, mais aucun résultat de suivi n'est conservé. Le zéro statique ne prouve pas un pointeur nul runtime.
 - Valeurs de comparaison précédemment demandées pour l'entrée `GetTlsValue` : `RCX=0`, `R8=0xA8`, `TPIDR_EL0=0xA2003C740`, `TLR=0x7010078000`. Ne pas les présenter comme une capture simultanée au crash.
 - L'historique mentionne les premiers outils Windows 0.2.0/0.3.0 et le probe `OrbitalsTlsCrashProbe` (commit correctif `ab4107c`, six erreurs restantes non confirmées résolues). Ce sont des annonces/états de travail, pas une preuve de build/test réussi. Voir `docs/ENVIRONMENT_AND_BUILD.md`.
+
+
+## Audit de cohérence — corrections du 21-11-2026
+
+Une relecture croisée du dépôt a révélé deux formulations historiques contradictoires dans cet index. Elles sont corrigées ici :
+
+1. La phrase antérieure affirmant que « l'analyse ARM64 de collection stride-0xE8 reste distincte et n'est pas reliée à ce chemin » est trop catégorique. Le modèle actuellement retenu est celui de **deux strides imbriqués** : l'élément extérieur est sélectionné à stride `0xE8`, son premier QWORD fournit la base de la structure intérieure consultée à stride `0x38`. Le lien structurel est donc présent dans l'analyse statique ; ce qui n'est pas prouvé est que les objets/fonctions producteurs étudiés soient bien ceux de l'instance runtime fautive.
+2. L'ancienne recommandation de rechercher encore les écritures QWORD dans les six objets est obsolète. Le QWORD Hunter sur les six objets et les 12 candidats est **terminé** ; ne pas refaire cette étape. Il n'a trouvé aucun store QWORD à displacement zéro dans ces six fichiers.
+
+Le détail historique complet de l'allocateur, omis de la première version de `CRASH_A.md`, a été ajouté dans ce dernier document. Le dossier de passation `crash-analyzer/INVESTIGATION.md` est conservé comme historique du 20 novembre ; ses anciennes étapes (Ghidra, analyse 0.2.0, reprise du scan des six objets) ne remplacent pas les consignes actuelles de cet index.
+
+### Builds Windows vérifiés dans GitHub Actions
+
+- Analyseur WPF : run [44867261298](https://github.com/sinedgiveaways/orbitals-timeout-analyzer/actions/runs/44867261298), succès, commit `b5c72fac2bf1a5c59a83ce8b2da5fa1d377773f6`, artifact `OrbitalsCrashAnalyzer-win-x64`, ID `14691748393`, 59,409,094 octets, expiration `2026-12-21`.
+- Outils Pointer Provenance + rapport fallback : run [44951389432](https://github.com/sinedgiveaways/orbitals-timeout-analyzer/actions/runs/44951389432), succès, commit `b9486a273e35a0b1b87857f183e1f366ba0cbd48`, artifact ID `14726090607`, 24,905,547 octets.
+- QWORD Writer Hunter : run [44941325433](https://github.com/sinedgiveaways/orbitals-timeout-analyzer/actions/runs/44941325433), succès, commit `0634c2905f457d09d9280bc657fc318c7155e9d9`, artifact ID `14721153910`, 12,454,478 octets.
+
+Les trois runs et leurs jobs ont été relus : statut `success`. Les commits de documentation postérieurs n'ont pas modifié le code de ces exécutables ; cela ne signifie pas que les dernières sources de l'analyseur ont été recompilées sur le dernier commit documentaire.
