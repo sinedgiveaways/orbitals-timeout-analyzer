@@ -11,6 +11,12 @@ Conserver dans le dépôt les faits techniques établis pendant l'analyse des pl
 - [Crash B — accès mémoire 0x104 / chemin TLS](CRASH_B.md)
 - [Environnement, builds et contraintes de travail](ENVIRONMENT_AND_BUILD.md)
 
+
+
+## Analyse des 12 candidats E8
+
+- [Comparaison des 12 candidats d'écriture E8](CRASH_B_CANDIDATES_12.md) — regroupe les instructions reçues, distingue les écritures DWORD des pointeurs QWORD et consigne les vérifications encore nécessaires.
+
 ## Priorités
 
 1. **Crash B est la priorité actuelle.** L'accès à `0x104` et le chemin TLS restent à expliquer.
