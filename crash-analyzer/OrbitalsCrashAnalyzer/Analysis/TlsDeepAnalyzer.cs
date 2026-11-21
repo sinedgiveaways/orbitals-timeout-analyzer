@@ -8,7 +8,7 @@ public static class TlsDeepAnalyzer
 {
     private sealed record Seg(string Name, uint Mem, byte[] Data);
 
-    public static string Analyze(string? mainPath, string? sdkPath)
+    public static string Analyze(string? mainPath, string? sdkPath, string? logText = null)
     {
         var b = new StringBuilder();
         b.AppendLine("========== ANALYSE TLS APPROFONDIE 0.5.0 ==========");
@@ -50,6 +50,9 @@ public static class TlsDeepAnalyzer
             FindBranches(sdk, 0x16B670, b);
         }
         else b.AppendLine("\n[SDK] Non fourni : les chemins internes du SDK ne peuvent pas être confirmés dans ce passage.");
+
+        b.AppendLine();
+        AppendRuntimeEvidence(logText, b);
 
         b.AppendLine();
         b.AppendLine("[RÉPONSES AUX QUESTIONS]");
@@ -263,6 +266,35 @@ public static class TlsDeepAnalyzer
         if ((w & 0x7E000000) == 0x34000000) return $"CBZ/CBNZ {R(rd)}, branch";
         if ((w & 0xFF000010) == 0x54000000) return "B.cond";
         return "instruction ARM64 (non décodée)";
+    }
+
+
+    private static void AppendRuntimeEvidence(string? logText, StringBuilder output)
+    {
+        output.AppendLine("[C] INDICES RUNTIME EXTRAITS DU LOG FOURNI");
+        if (string.IsNullOrWhiteSpace(logText))
+        {
+            output.AppendLine("Aucun log fourni à l'analyse approfondie. Les seules valeurs runtime disponibles sont celles déjà préchargées dans le profil.");
+            return;
+        }
+        var lines = logText.Replace("\r", "").Split('\n');
+        var pattern = new System.Text.RegularExpressions.Regex(
+            @"(?i)(?:\\b(?:x[0-7]|w0|rcx|r8|rdx|rax|tpidr(?:ro)?_el0|tlr)\\s*[=:]|GetTlsValue entry|guest thread=|host instruction:|reading address\\s+0x104)");
+        var hits = lines.Select((line, index) => (line, index))
+            .Where(x => pattern.IsMatch(x.line))
+            .TakeLast(100).ToArray();
+        if (hits.Length == 0)
+        {
+            output.AppendLine("Aucune ligne de registre x0-x7/w0 ou RCX/R8 détectée dans le log fourni.");
+            return;
+        }
+        output.AppendLine("Lignes sources correspondantes (numéros conservés ; proximité textuelle ne garantit pas qu'elles décrivent le même instant) :");
+        foreach (var hit in hits)
+            output.AppendLine($"  L{hit.index + 1}: {hit.line.Trim()}");
+        bool guestArgs = hits.Any(x => System.Text.RegularExpressions.Regex.IsMatch(x.line, @"(?i)\\b(?:x[0-7]|w0)\\s*[=:]"));
+        bool hostArgs = hits.Any(x => System.Text.RegularExpressions.Regex.IsMatch(x.line, @"(?i)\\b(?:rcx|r8)\\s*[=:]"));
+        output.AppendLine($"Registres invités x0-x7/w0 présents : {(guestArgs ? "oui" : "non")}.");
+        output.AppendLine($"Registres hôtes RCX/R8 présents : {(hostArgs ? "oui" : "non")}.");
     }
 
     private static long SignExtend(uint v, int bits) => unchecked((int)(v << (32-bits))) >> (32-bits);
