@@ -145,7 +145,7 @@ public static class TlsDeepAnalyzer
         if ((w & 0x7F800000) == 0x52800000 || (w & 0x7F800000) == 0x72800000) return (int)(w & 31);
         if ((w & 0x1F000000) == 0x11000000) return (int)(w & 31);
         if ((w & 0x9F000000) == 0x90000000 || (w & 0x9F000000) == 0x10000000) return (int)(w & 31);
-        if ((w & 0x3B000000) == 0x39000000 || (w & 0x3B200C00) == 0x38200800) return (int)(w & 31);
+        if (((w & 0x3B000000) == 0x39000000 || (w & 0x3B200C00) == 0x38200800) && (w & (1u << 22)) != 0) return (int)(w & 31);
         if ((w & 0x1F200000) == 0x0B000000) return (int)(w & 31);
         if ((w & 0x7FE0FC00) == 0x2A000000) return (int)(w & 31);
         if ((w & 0x7FE0FC00) == 0x2A000000) return (int)(w & 31);
@@ -255,8 +255,8 @@ public static class TlsDeepAnalyzer
         if ((w & 0x3B200C00) == 0x38200800) return $"LDR/STR register-offset {R(rd)}, [{R(rn)}, {R(rm)}]";
         if ((w & 0x7FE0FC00) == 0x2A000000) return $"MOV {R(rd)}, {R(rm)}";
         if ((w & 0x7F200000) == 0x0B000000) return $"ADD/SUB register {R(rd)}, {R(rn)}, {R(rm)}";
-        if ((w & 0xFFFFF000) == 0xD53BD000) return $"MRS {R(rd)}, TPIDR_EL0";
-        if ((w & 0xFFFFF000) == 0xD53BD000) return $"MRS {R(rd)}, system-register";
+        if ((w & 0xFFFFFFE0) == 0xD53BD040) return $"MRS {R(rd)}, TPIDR_EL0";
+        if ((w & 0xFFFFFFE0) == 0xD53BD060) return $"MRS {R(rd)}, TPIDRRO_EL0";
         if ((w & 0xFFC00000) == 0xA9800000) return $"STP pair (base {R(rn)})";
         if ((w & 0xFFC00000) == 0xA9400000) return $"LDP pair (base {R(rn)})";
         if ((w & 0x7F000000) == 0x71000000) return $"SUBS/CMP immediate {R(rn,false)}, #0x{(w>>10)&0xFFF:X}";
