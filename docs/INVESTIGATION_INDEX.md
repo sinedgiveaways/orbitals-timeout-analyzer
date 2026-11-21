@@ -103,3 +103,8 @@ Les strides 0xE8 et 0x38 ne sont pas contradictoires : [rsi+0xD8] désigne un en
 ## Compléments archivés — 21-11-2026
 
 Le rapport ciblé documente aussi les écritures PTR_FROM_RSI_D8 aux offsets +0x10/+0x18/+0x20/+0x28/+0x30/+0x38/+0x58/+0x60, deux écritures potentielles à offset zéro (0x24745 et 0x3816D) non corrélées au record du crash, et l'usage scalaire signé de [rsi+0xD8] à 0x4CC32. Le dernier log runtime est maintenant détaillé dans ENVIRONMENT_AND_BUILD.md : flags NVN, recorder, texture aliases, DCC, staging pool, allocations headroom et probes romfs.
+
+
+## Détails exacts retrouvés — QWORD Hunter 0156.o (21-11-2026)
+
+Le rapport utilisateur identifie six stores QWORD dans `main_main_0156.o` : `[r15+rbx+0x78]=0`, `+0x80=rax`, `+0xB8=0`, `+0xC0=rax`, `+0xC8=0`, `+0xD0=rax`. L'origine rapportée de `r15` est `203295`. `[rsi+0x230]` alimente les valeurs QWORD écrites à `+0x80`, `+0xC0` et `+0xD0`. Contexte voisin : `0x31C1C` lit un octet à `[r15+rbx+0xD8]`, `0x31C25` charge `[rsi+0xD8]`, et `0x31C3A` teste `[rdx+0x40]` avant de recharger `[rsi+0x58]` sur le chemin alternatif. Deux adresses de stores sont confirmées (`0x31AD2`, `0x31AFE`) ; les quatre autres offsets d'instruction exacts ne sont pas récupérés avec certitude. Aucun de ces six stores n'écrit le premier QWORD à displacement zéro.
