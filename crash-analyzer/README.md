@@ -16,7 +16,7 @@ Il contient :
 
 **Priorité actuelle :** résoudre l'access violation à `0x104` dans le chemin invité `sdk+0x16b730` (`nn::os::GetTlsValue(TlsSlot)`). L'allocateur a déjà été largement étudié ; ne pas recommencer cette piste sans nouvelle preuve.
 
-## Version 0.2.0 — fonctionnalités
+## Fonctionnalités de base (introduites en 0.2.0)
 
 - Détection des signatures de crash (free d'un pointeur inconnu, canary, access violation, abort Nintendo, Vulkan).
 - Extraction des registres hôte/invité, PC, LR, TLR, frames invités et traces TPIDR présentes dans les logs.
@@ -37,7 +37,7 @@ L'application fonctionne localement : aucun log ni binaire n'est envoyé à GitH
 
 ## Limites
 
-- Le décodeur intégré est partiel ; utiliser Capstone, Ghidra ou IDA pour un vrai désassemblage.
+- Le décodeur ARM64 intégré reste partiel ; pour un désassemblage approfondi, utiliser Capstone ou un outil équivalent. Ghidra n'est pas requis pour cette investigation.
 - Les offsets `sdk+0x...` ne peuvent pas être désassemblés depuis `exefs/main` : le binaire SDK correspondant est nécessaire.
 - Les fenêtres et marqueurs sont des indices, pas une preuve de cause racine.
 
@@ -45,7 +45,7 @@ L'application fonctionne localement : aucun log ni binaire n'est envoyé à GitH
 
 Workflow : [Build Orbitals Crash Analyzer (Windows)](https://github.com/sinedgiveaways/orbitals-timeout-analyzer/actions/workflows/build-crash-analyzer.yml).
 
-Après un push sur `main), attendre un run vert, ouvrir le run, puis télécharger l'artefact `OrbitalsCrashAnalyzer-win-x64`. Vérifier que l'artefact correspond au commit courant avant de le tester.
+Après un push sur `main`, attendre un run vert, ouvrir le run, puis télécharger l'artefact `OrbitalsCrashAnalyzer-win-x64`. Vérifier que l'artefact correspond au commit courant avant de le tester.
 
 L'ancien build 0.2.0 validé est documenté dans [INVESTIGATION.md](INVESTIGATION.md) ; il ne contient pas les corrections récentes de sélection des offsets.
 
