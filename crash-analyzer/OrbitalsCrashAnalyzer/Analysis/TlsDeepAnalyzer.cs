@@ -305,8 +305,10 @@ public static class TlsDeepAnalyzer
             return;
         }
         var lines = logText.Replace("\r", "").Split('\n');
+        // The runtime prints host registers as "host rcx 000000..." (space-separated),
+        // not "rcx=..." or "rcx:...". Match that exact format as well as guest register formats.
         var pattern = new System.Text.RegularExpressions.Regex(
-            @"(?i)(?:\b(?:x[0-7]|w0|rcx|r8|rdx|rax|tpidr(?:ro)?_el0|tlr)\s*[=:]|GetTlsValue entry|guest thread=|host instruction:|reading address\s+0x104)");
+            @"(?i)(?:\b(?:x[0-7]|w0|rcx|r8|rdx|rax|tpidr(?:ro)?_el0|tlr)\s*[=:]|\bhost\s+(?:rax|rcx|rdx|rbx|rsp|rbp|rsi|rdi|r8|r9|r10|r11|r12|r13|r14|r15)\s+[0-9a-f]{8,16}|GetTlsValue entry|guest thread=|host instruction:|reading address\s+0x104)");
         var hits = lines.Select((line, index) => (line, index))
             .Where(x => pattern.IsMatch(x.line))
             .TakeLast(100).ToArray();
@@ -319,9 +321,31 @@ public static class TlsDeepAnalyzer
         foreach (var hit in hits)
             output.AppendLine($"  L{hit.index + 1}: {hit.line.Trim()}");
         bool guestArgs = hits.Any(x => System.Text.RegularExpressions.Regex.IsMatch(x.line, @"(?i)\b(?:x[0-7]|w0)\s*[=:]"));
-        bool hostArgs = hits.Any(x => System.Text.RegularExpressions.Regex.IsMatch(x.line, @"(?i)\b(?:rcx|r8)\s*[=:]"));
+        var hostRegs = new Dictionary<string, ulong>(StringComparer.OrdinalIgnoreCase);
+        foreach (Match m in System.Text.RegularExpressions.Regex.Matches(logText,
+            @"(?im)\bhost\s+(rax|rcx|rdx|rbx|rsp|rbp|rsi|rdi|r8|r9|r10|r11|r12|r13|r14|r15)\s+((?:0x)?[0-9a-f]{8,16})"))
+        {
+            string value = m.Groups[2].Value;
+            if (value.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) value = value[2..];
+            if (ulong.TryParse(value, System.Globalization.NumberStyles.HexNumber, null, out ulong parsed))
+                hostRegs[m.Groups[1].Value] = parsed;
+        }
         output.AppendLine($"Registres invités x0-x7/w0 présents : {(guestArgs ? "oui" : "non")}.");
-        output.AppendLine($"Registres hôtes RCX/R8 présents : {(hostArgs ? "oui" : "non")}.");
+        output.AppendLine($"Registres hôtes capturés : {(hostRegs.Count > 0 ? string.Join(", ", hostRegs.Keys.OrderBy(x => x)) : "aucun")}.");
+        foreach (string name in new[] { "rcx", "r8", "rdx", "rax", "rip", "rsp" })
+            if (hostRegs.TryGetValue(name, out ulong value))
+                output.AppendLine($"  HOST {name.ToUpperInvariant()} = 0x{value:X16}");
+        // Crash B's host instruction is: mov ecx, [rcx + r8 + 0x5c] (bytes 42 8B 4C 01 5C).
+        // If the exception context contains RCX and R8, calculate the actual memory operand.
+        if (hostRegs.TryGetValue("rcx", out ulong rcx) && hostRegs.TryGetValue("r8", out ulong r8))
+        {
+            ulong ea = unchecked(rcx + r8 + 0x5CUL);
+            output.AppendLine($"Adresse effective x86-64 [RCX+R8+0x5C] = 0x{ea:X16}.");
+            var fault = System.Text.RegularExpressions.Regex.Match(logText, @"(?i)reading address\s+(0x[0-9a-f]+)");
+            if (fault.Success && ulong.TryParse(fault.Groups[1].Value.AsSpan(2), System.Globalization.NumberStyles.HexNumber, null, out ulong faultAddr))
+                output.AppendLine($"Adresse fautive annoncée = 0x{faultAddr:X16} ; concordance calculée : {(ea == faultAddr ? "OUI" : "NON")}.");
+        }
+        else output.AppendLine("Adresse effective x86-64 non calculable : RCX ou R8 absent de la capture hôte.");
     }
 
     private static long SignExtend(uint v, int bits) => unchecked((int)(v << (32-bits))) >> (32-bits);
