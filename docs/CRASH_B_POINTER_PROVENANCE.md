@@ -23,9 +23,9 @@ Séquence du bloc de secours :
 0x1952F: mov ecx, dword ptr [rcx + r8 + 0x5c]
 ```
 
-Le calcul de consultation utilise un **stride de 0x38**, pas 0xE8. La chaîne de pointeurs est : slot local `[rsi+0xD8]` → pointeur chargé dans `rax` → premier QWORD de l'objet chargé dans `rcx` → lecture `[rcx + (2-edx)*0x38 + 0x5C]`.
+Il y a **deux niveaux distincts** : le slot `[rsi+0xD8]` pointe vers un enregistrement extérieur sélectionné avec un stride **0xE8** (adresse calculée à `0x18F5C` comme `base + index*0xE8`) ; le premier QWORD de cet enregistrement, chargé dans `rcx` à `0x1950E`, sert de base à une seconde structure consultée avec un stride **0x38**. La chaîne est : slot local `[rsi+0xD8]` → adresse de l'enregistrement extérieur E8 (`rax`) → premier QWORD de cet enregistrement (base interne `rcx`) → lecture `[rcx + (2-edx)*0x38 + 0x5C]`.
 
-Le premier QWORD de l'objet est donc la base de la lecture fautive. Un pointeur nul pourrait expliquer une lecture proche de zéro, mais les valeurs synchronisées de RCX/R8 au PC fautif ne sont pas disponibles. Il n'est pas prouvé que RCX valait zéro au moment de l'exception.
+Le premier QWORD de l'enregistrement extérieur stride-0xE8 est donc la base de la structure intérieure consultée avec stride 0x38. Un pointeur nul pourrait expliquer une lecture proche de zéro, mais les valeurs synchronisées de RCX/R8 au PC fautif ne sont pas disponibles. Il n'est pas prouvé que RCX valait zéro au moment de l'exception.
 
 ## 2. Les six objets : résultat QWORD Hunter terminé
 
