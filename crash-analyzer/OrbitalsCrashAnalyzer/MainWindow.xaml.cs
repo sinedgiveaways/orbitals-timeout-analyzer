@@ -98,7 +98,7 @@ public partial class MainWindow : Window
                 report.AppendLine("\n[SDK] Non chargé. Les résultats antérieurs sur GetTlsValue et TlsManager restent affichés ; charger sdk uniquement pour une nouvelle vérification du binaire.");
 
             report.AppendLine();
-            report.AppendLine(TlsDeepAnalyzer.Analyze(_mainPath, _sdkPath));
+            report.AppendLine(TlsDeepAnalyzer.Analyze(_mainPath, _sdkPath, logText));
 
             report.AppendLine();
             report.AppendLine("[MODE D'EMPLOI]");
