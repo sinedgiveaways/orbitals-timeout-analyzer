@@ -56,7 +56,7 @@ L'analyse statique du fichier existant `setup-work/obj/main_main_0184.o` a local
 
 Le mécanisme est compatible avec un premier qword nul dans l'élément sélectionné, ce qui explique une lecture proche de zéro telle que `0x104`. Cela ne prouve pas encore quelle branche est prise au runtime, ni où le champ est initialisé. Le détail, les limites du CFG local et les extraits assembleur sont dans [CRASH_B.md](CRASH_B.md).
 
-**Prochaine étape :** analyser les objets déjà présents dans `setup-work/obj` pour retrouver les écritures au début des enregistrements de stride `0xE8` et les fonctions qui construisent/remplissent la collection. Ne pas relancer `prepare.py` ou une recompilation complète.
+**État corrigé au 21-11-2026 :** l'analyse des six objets et des 12 candidats a déjà été réalisée. Le QWORD Hunter n'a trouvé aucun store QWORD à displacement zéro dans ces six objets. Ne pas relancer cette étape. La prochaine question n'est plus de refaire ce balayage, mais de corréler les write-through candidats du rapport de provenance avec l'élément extérieur réellement sélectionné au runtime, puis de capturer son premier QWORD au moment du crash.
 
 ## Limite de cette sauvegarde
 
@@ -86,7 +86,7 @@ La cause racine de Crash B reste non déterminée. Les preuves manquantes sont l
 
 ## Errata et résultats QWORD Hunter — 21-11-2026
 
-Une correction importante est apportée : le consommateur exact du crash dans main_main_0184.o (.text+0x1952F) utilise un stride **0x38**, et non 0xE8. Il charge [rsi+0xD8], puis le premier QWORD pointé, avant de lire [rcx+(2-edx)*0x38+0x5C]. L'analyse ARM64 de collection stride-0xE8 reste distincte et n'est pas reliée à ce chemin. Voir le rapport ciblé [CRASH_B_POINTER_PROVENANCE.md](CRASH_B_POINTER_PROVENANCE.md).
+Une correction importante est apportée : le consommateur exact du crash dans main_main_0184.o (.text+0x1952F) utilise un stride **0x38**, et non 0xE8. Il charge [rsi+0xD8], puis le premier QWORD pointé, avant de lire [rcx+(2-edx)*0x38+0x5C]. Le modèle corrigé est celui de deux strides imbriqués : sélection de l'enregistrement extérieur à stride 0xE8, puis lecture de sa structure intérieure à stride 0x38. Le scan des six objets cherchait notamment le writer du premier QWORD extérieur ; aucun writer correspondant n'a été identifié dans ces six fichiers. Voir le rapport ciblé [CRASH_B_POINTER_PROVENANCE.md](CRASH_B_POINTER_PROVENANCE.md).
 
 Le QWORD Hunter sur les six objets est terminé : 0156.o 7 stores stride-E8 / 6 QWORD / 0 disp0 ; 0157.o 3/0/0 ; 0173.o 5/0/0 ; 0184.o 2/0/0 ; 0186.o 3/0/0 ; 0330.o 2/0/0. Aucun store QWORD détecté à displacement zéro d'un élément stride-E8. Cela ne trouve pas le producteur du pointeur consommé à 0x1950E.
 
