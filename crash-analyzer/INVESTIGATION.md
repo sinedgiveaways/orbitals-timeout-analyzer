@@ -1,5 +1,10 @@
 # Orbitals Recomp — dossier de passation et plan de résolution
 
+
+> **Avis de mise à jour (21 novembre 2026) — document historique.** Ce dossier de passation a été rédigé le 20 novembre et contient des étapes désormais obsolètes. Pour l'état courant, les faits validés et les prochaines actions, utiliser en priorité [`docs/INVESTIGATION_INDEX.md`](../docs/INVESTIGATION_INDEX.md), [`docs/CRASH_B.md`](../docs/CRASH_B.md), [`docs/CRASH_B_POINTER_PROVENANCE.md`](../docs/CRASH_B_POINTER_PROVENANCE.md), [`docs/CRASH_A.md`](../docs/CRASH_A.md) et [`docs/ENVIRONMENT_AND_BUILD.md`](../docs/ENVIRONMENT_AND_BUILD.md).
+>
+> En particulier : l'examen des six objets / 12 candidats est terminé et ne doit pas être recommencé ; l'utilisateur ne souhaite pas utiliser Ghidra ; ne pas proposer de commandes PowerShell répétitives ; ne pas lancer `prepare.py`, la génération ou une recompilation complète pour les analyses statiques. Le modèle de Crash B actuellement documenté est celui de deux strides imbriqués (extérieur `0xE8`, intérieur `0x38`), sans cause racine confirmée. Le build WPF 0.5.2 et les deux outils d'analyse Crash B disposent de runs Windows réussis répertoriés dans `docs/ENVIRONMENT_AND_BUILD.md`.
+
 **Dernière mise à jour : 20 novembre 2026**  
 **Dépôt :** `sinedgiveaways/orbitals-timeout-analyzer`  
 **But :** permettre à une autre personne ou à une nouvelle session de reprendre l'enquête sans refaire les analyses déjà terminées.
