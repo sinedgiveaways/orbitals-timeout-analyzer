@@ -62,3 +62,20 @@ L'utilisateur a explicitement confirmé que l'examen des six objets contenant le
 Les 12 instructions ci-dessus restent des écritures DWORD de 4 octets. Elles ne montrent pas directement l'écriture QWORD du premier champ de l'élément base + index*0xE8. Le dossier ne conserve pas ici l'intégralité des désassemblages des fonctions examinées ni une preuve reliant un candidat au pointeur nul consommé dans main_main_0184.o. Aucun candidat ne peut donc être désigné comme constructeur ou écrivain causal sur la seule base de cette liste.
 
 Statut : examen effectué ; lien causal non établi. La suite doit exploiter les conclusions détaillées déjà obtenues localement, sans refaire les scans ni demander de nouveau les mêmes sorties.
+
+
+
+## Résultats QWORD Hunter — six objets examinés (21-11-2026)
+
+| Objet | Stores stride 0xE8 | Stores QWORD | QWORD displacement 0 |
+|---|---:|---:|---:|
+| main_main_0156.o | 7 | 6 | 0 |
+| main_main_0157.o | 3 | 0 | 0 |
+| main_main_0173.o | 5 | 0 | 0 |
+| main_main_0184.o | 2 | 0 | 0 |
+| main_main_0186.o | 3 | 0 | 0 |
+| main_main_0330.o | 2 | 0 | 0 |
+
+Dans 0156.o, les destinations exactes conservées incluent .text+0x31AD2 (QWORD zéro à +0x78) et .text+0x31AFE (QWORD rax à +0x80). Aucun QWORD store détecté à displacement 0 dans les six objets. Les 12 sites initiaux sont DWORD et ne prouvent pas le writer du pointeur lu au crash. L'étape est terminée : ne pas la redemander.
+
+**Correction de périmètre :** le consommateur hôte main_main_0184.o+.text+0x1952F utilise stride 0x38, pas 0xE8. Le scan stride-0xE8 ne décrit pas à lui seul la structure lue par ce consommateur et n'a pas établi de lien causal.
