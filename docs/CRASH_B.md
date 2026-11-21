@@ -140,9 +140,70 @@ Autres observations :
 - destructeur repéré à `main+0x1A820` ;
 - fonctions `main+0xBF5A0` et `main+0xBF540` chargent `w0` depuis `main+0x90100F8`, puis appellent `GetTlsValue` via PLT.
 
-Le gestionnaire TLS examiné initialise un compteur à 0, un mutex à l'offset `+0x108), réserve 32 entrées de destructeurs et recherche un slot libre parmi les indices 0 à 31. L'allocation appelle `SetZeroToAllThreadsTlsSafe`.
+Le gestionnaire TLS examiné initialise un compteur à 0, un mutex à l'offset `+0x108`, réserve 32 entrées de destructeurs et recherche un slot libre parmi les indices 0 à 31. L'allocation appelle `SetZeroToAllThreadsTlsSafe`.
 
 Le pointeur global de constructeur SDK à `sdk+0xE6E010` était nul dans l'image statique ; il peut être initialisé à l'exécution. La valeur statique seule ne suffit pas à conclure à un défaut d'initialisation runtime.
+
+## Analyse statique de provenance — objet COFF main_main_0184.o (21-11-2026)
+
+Un rapport de l'analyseur Windows a été produit sur le fichier existant :
+
+`setup-work/obj/main_main_0184.o`
+
+Aucune préparation, génération ou recompilation du jeu n'a été nécessaire pour cette analyse. Le fichier est un objet COFF x64 (`Machine=0x8664`) ; sa section `.text` brute fait `0x55C4F` octets. La fenêtre étudiée est `0x189A0–0x19550`, avec instruction de crash à l'offset objet `0x1952F`.
+
+### Construction du pointeur conservé dans [rsi+0xD8]
+
+Le chemin statique local contient :
+
+```asm
+0x18F09: mov r9, qword ptr [rsi + 0xa8]
+0x18F4A: mov rax, qword ptr [r9 + 0x158]
+0x18F51: imul r8, r8, 0xe8
+0x18F58: lea rcx, [rax + r8]
+0x18F5C: mov qword ptr [rsi + 0xd8], rcx
+```
+
+Interprétation limitée à ce qui est directement visible : `[rsi+0xD8]` reçoit l'adresse calculée comme `base + index*0xE8`, où la base provient du pointeur situé à `[ [rsi+0xA8] + 0x158 ]`. Cela désigne un élément dans une structure parcourue avec un pas de `0xE8`. Le type et la signification métier de cette structure ne sont pas encore connus.
+
+### Chemin de déréférencement fautif
+
+Le bloc de secours contient :
+
+```asm
+0x19507: mov rax, qword ptr [rsi + 0xd8]
+0x1950E: mov rcx, qword ptr [rax]
+0x19511: mov qword ptr [rsi + 0x58], 0x38
+0x19519: mov eax, 2
+0x1951E: sub eax, edx
+0x19520: imul r8, rax, 0x38
+0x19524: lea r9, [rcx + r8]
+0x19528: mov qword ptr [rsi + 0xc8], r9
+0x1952F: mov ecx, dword ptr [rcx + r8 + 0x5c] ; instruction fautive
+```
+
+Le point important est la double indirection : le code charge d'abord le pointeur `[rsi+0xD8]`, puis lit le premier qword de l'élément pointé (`mov rcx,[rax]`). L'accès fautif suivant utilise ce qword comme base. Si ce premier champ vaut zéro, l'adresse effective devient `0 + R8 + 0x5C`. La lecture à `0x104` est donc compatible avec une base nulle et un déplacement combiné de `0xA8` (par exemple `R8=0xA8)), mais cela ne suffit pas à établir à lui seul que ces registres appartiennent exactement à cette occurrence d'instruction.
+
+**Conclusion statique solide :** le chemin de secours déréférence le premier qword de l'élément sélectionné, puis accède à un champ situé à `+R8+0x5C`. Un premier qword nul explique directement une lecture proche de zéro telle que `0x104`. Le pointeur `[rsi+0xD8]` lui-même n'est pas nul sur ce chemin, car le chargement de son premier qword a lieu avant l'accès fautif.
+
+### Deux conditions d'entrée dans le bloc de secours
+
+Le graphe de contrôle local identifie deux branches directes vers `0x19507` :
+
+- `0x19473: je 0x19507` : le compteur de la collection lu à `[collection+0x470]` est nul ;
+- `0x194A4: je 0x19507` : le parcours atteint la condition terminale `0x50` sans avoir trouvé de correspondance.
+
+Le rapport local indique que l'unique écriture directe de `[rsi+0xD8]` pouvant atteindre ce bloc dans le CFG analysé est celle de `0x18F5C`. C'est une analyse locale et conservatrice : elle ne suit pas les alias mémoire, les appels inter-fonctions ni les branches indirectes. Elle ne prouve donc pas que tous les chemins d'exécution ont nécessairement exécuté cette écriture.
+
+### Ce qui reste à déterminer
+
+1. Quelle des deux branches vers `0x19507` est prise au runtime ?
+2. Quel est le premier qword de l'élément `0xE8) au moment où il est sélectionné ?
+3. Où et quand ce premier qword est-il initialisé ou écrit ?
+4. Quelle fonction construit/remplit la collection accessible via `[rsi+0xA8]`, avec les champs `+0x468` (pointeur de données) et `+0x470` (compteur) ?
+5. L'index utilisé dans le calcul `base + index*0xE8` sélectionne-t-il un élément valide dans tous les cas ?
+
+La prochaine analyse doit donc rechercher les écritures au début des éléments de pas `0xE8` et remonter à la construction/remplissage de cette collection, en inspectant les objets déjà présents dans `setup-work/obj`. Il ne faut pas relancer `prepare.py` ni reconstruire le jeu pour cela.
 
 ## Binaire et structure
 
@@ -157,33 +218,34 @@ Le pointeur global de constructeur SDK à `sdk+0xE6E010` était nul dans l'image
 ## Questions encore ouvertes
 
 1. Quelle est la vraie valeur de `w0/TlsSlot` à l'entrée effective de `GetTlsValue` au moment du crash ?
-2. Quel pointeur exact est contenu à `TPIDRRO_EL0` puis à l'offset `+0x1F8) au moment précis de l'accès ?
-3. La base nulle ou invalide vient-elle de l'état invité ou de la traduction hôte ? Les registres hôtes `RCX/R8` n'ont pas été capturés.
+2. Quel pointeur exact est contenu à `TPIDRRO_EL0` puis à l'offset `+0x1F8` au moment précis de l'accès ?
+3. La base nulle ou invalide vient-elle de l'état invité ou de la traduction hôte ? Les registres hôtes `RCX/R8` n'ont pas été capturés de façon synchronisée avec l'instruction objet examinée.
 4. Le slot TLS est-il invalide, non initialisé, hors plage, ou bien une corruption antérieure a-t-elle détruit un pointeur ?
 5. Quelle instruction et quel chemin d'exécution relient exactement `main+0x1759B20` à la lecture fautive ?
+6. Quel code initialise le premier qword des éléments de la collection de stride `0xE8` ?
 
 ## Instrumentation ciblée recommandée
 
 Si l'analyse statique des binaires ne permet pas de trancher, instrumenter seulement les points utiles, sans reconstruire tout le jeu :
 
 ### À l'entrée de `main+0x1759B20`
-- `x0-x7) ;
-- `TPIDR_EL0) ;
-- `TPIDRRO_EL0) ;
+- `x0-x7` ;
+- `TPIDR_EL0` ;
+- `TPIDRRO_EL0` ;
 - pointeur lu à `TPIDRRO_EL0` puis valeur à `+0x1F8`.
 
 ### À l'entrée réelle de `GetTlsValue`
-- `w0/TlsSlot) ;
+- `w0/TlsSlot` ;
 - pointeur de base ;
 - adresse calculée après `ADD x8, x8, w0, UXTW #3` ;
 - valeur du pointeur avant le chargement final à `+0x80`.
 
 ### Au PC hôte de l'exception
-- `RCX`, `R8`, `RDX), `RAX) ;
+- `RCX`, `R8`, `RDX`, `RAX` ;
 - adresse effective calculée pour `[RCX + R8 + 0x5C]`.
 
 Ne pas remplacer une capture manquante par une déduction depuis les registres invités.
 
 ## Conclusion actuelle
 
-Le rapport associe le PC hôte `orbitalgame+0x1B5B682F` à la fonction invitée levée `main+0x1759B20`. Le SDK contient un chemin TLS pertinent dans `GetTlsValue`, et des indices runtime montrent des valeurs TPIDR/TLR et des objets thread. **La cause racine n'est pas encore prouvée.** La priorité est de déterminer les valeurs réelles des registres et pointeurs au bon point d'exécution, puis de remonter à l'origine du pointeur invalide.
+Le rapport associe le PC hôte `orbitalgame+0x1B5B682F` à la fonction invitée levée `main+0x1759B20`. Le SDK contient un chemin TLS pertinent dans `GetTlsValue`, et des indices runtime montrent des valeurs TPIDR/TLR et des objets thread. L'analyse du COFF `main_main_0184.o` affine désormais le mécanisme mémoire : le bloc de secours sélectionne un élément de stride `0xE8`, charge son premier qword comme pointeur, puis le déréférence à l'offset `+R8+0x5C`. **La cause racine n'est toujours pas prouvée** : il faut encore identifier la branche runtime empruntée et le code qui initialise ce premier qword.
