@@ -17,11 +17,15 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: python -m pip install pyinstaller capstone
-      - name: Build standalone Windows GUI
+      - name: Build pointer provenance GUI
         run: pyinstaller --noconfirm --clean --onefile --windowed --name Orbitals_CrashB_Pointer_Provenance tools/crash_b_pointer_provenance_v2/orbitals_crash_b_pointer_provenance_v2.py
+      - name: Build fallback disassembly report GUI
+        run: pyinstaller --noconfirm --onefile --windowed --name Orbitals_CrashB_Report_Generator --distpath dist/fallback --workpath build/fallback --specpath build/fallback tools/crash_b_pointer_provenance_v2/orbitals_crash_b_fallback_dump.py
       - uses: actions/upload-artifact@v4
         with:
-          name: Orbitals_CrashB_Pointer_Provenance_Windows
-          path: dist/Orbitals_CrashB_Pointer_Provenance.exe
+          name: Orbitals_CrashB_Analysis_Tools_Windows
+          path: |
+            dist/Orbitals_CrashB_Pointer_Provenance.exe
+            dist/fallback/Orbitals_CrashB_Report_Generator.exe
           if-no-files-found: error
           retention-days: 30
