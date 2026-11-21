@@ -12,31 +12,32 @@ public partial class MainWindow : Window
     private string? _logPath;
     private string? _mainPath;
     private string? _sdkPath;
-    private string _lastReport = "Charge le log, exefs\\main et exefs\\sdk, puis lance l'analyse.";
+    private string _lastReport = "Profil TLS préchargé. Les fichiers complémentaires sont facultatifs.";
 
     public MainWindow()
     {
         InitializeComponent();
         ReportBox.Text = _lastReport;
+        RunAnalysis();
     }
 
     private void LoadLog_Click(object sender, RoutedEventArgs e)
     {
-        var d = new OpenFileDialog { Title = "Sélectionner le log Orbitals", Filter = "Logs|*.log;*.txt|Tous les fichiers|*.*" };
+        var d = new OpenFileDialog { Title = "Ajouter un log Orbitals (facultatif)", Filter = "Logs|*.log;*.txt|Tous les fichiers|*.*" };
         if (d.ShowDialog() != true) return;
         _logPath = d.FileName; LogPathText.Text = _logPath; RunAnalysis();
     }
 
     private void LoadMain_Click(object sender, RoutedEventArgs e)
     {
-        var d = new OpenFileDialog { Title = "Sélectionner exefs/main", Filter = "NSO / main|main;*.nso|Tous les fichiers|*.*" };
+        var d = new OpenFileDialog { Title = "Ajouter exefs/main (facultatif)", Filter = "NSO / main|main;*.nso|Tous les fichiers|*.*" };
         if (d.ShowDialog() != true) return;
         _mainPath = d.FileName; MainPathText.Text = _mainPath; RunAnalysis();
     }
 
     private void LoadSdk_Click(object sender, RoutedEventArgs e)
     {
-        var d = new OpenFileDialog { Title = "Sélectionner exefs/sdk", Filter = "NSO / sdk|sdk;*.nso|Tous les fichiers|*.*" };
+        var d = new OpenFileDialog { Title = "Ajouter exefs/sdk (facultatif)", Filter = "NSO / sdk|sdk;*.nso|Tous les fichiers|*.*" };
         if (d.ShowDialog() != true) return;
         _sdkPath = d.FileName; SdkPathText.Text = _sdkPath; RunAnalysis();
     }
@@ -51,7 +52,7 @@ public partial class MainWindow : Window
             if (ulong.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.HexNumber, null, out var v) && seen.Add(v))
                 values.Add(v);
 
-        bool tlsCrash = Regex.IsMatch(text, @"(?i)GetTlsValue|sdk\+0x16b730|reading address\\s+0x104");
+        bool tlsCrash = Regex.IsMatch(text, @"(?i)GetTlsValue|sdk\+0x16b730|reading address\s+0x104");
         if (tlsCrash)
             foreach (ulong v in new ulong[] { 0x16B670, 0x16B730, 0x16C520, 0x16C7B0, 0x16CC30 })
                 if (seen.Add(v)) values.Add(v);
@@ -64,34 +65,44 @@ public partial class MainWindow : Window
         {
             var report = new StringBuilder();
             report.AppendLine("ORBITALS CRASH ANALYZER — RAPPORT COMPLET");
-            report.AppendLine($"Version : 0.3.0 | Date : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            report.AppendLine($"Version : 0.4.0 | Date : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            report.AppendLine("Aucune préparation, génération ou recompilation du jeu n'est exécutée.");
             report.AppendLine(new string('=', 90));
+            report.AppendLine(InvestigationProfile.Render());
+
             string logText = _logPath is not null ? File.ReadAllText(_logPath) : "";
-            if (_logPath is not null) report.AppendLine(LogAnalyzer.Analyze(_logPath));
-            else report.AppendLine("[LOG] Aucun log chargé.");
+            if (_logPath is not null)
+            {
+                report.AppendLine();
+                report.AppendLine("[ANALYSE DU LOG FOURNI]");
+                report.AppendLine(LogAnalyzer.Analyze(_logPath));
+            }
+            else
+                report.AppendLine("\n[LOG] Aucun log relu : le profil ci-dessus reprend les résultats déjà établis. Ajouter un log uniquement pour examiner un nouvel événement ou vérifier un changement.");
 
             var mainOffsets = CrashContextAnalyzer.FindMainOffsets(logText);
             var sdkOffsets = FindSdkOffsets(logText);
+            foreach (ulong v in new ulong[] { 0x1759B20, 0x175A16C, 0x1750B88, 0x1750650, 0x1718CF8, 0x1D77D64, 0x1D761E0, 0x1641F84 })
+                if (!mainOffsets.Contains(v)) mainOffsets.Add(v);
+            foreach (ulong v in new ulong[] { 0x16B670, 0x16B730, 0x16C520, 0x16C7B0, 0x16CC30 })
+                if (!sdkOffsets.Contains(v)) sdkOffsets.Add(v);
 
             if (_mainPath is not null)
                 report.AppendLine(NsoAnalyzer.Analyze(_mainPath, mainOffsets, "main"));
-            else report.AppendLine("[MAIN] Non chargé.");
+            else
+                report.AppendLine("\n[MAIN] Non chargé. Le rapport conserve les adresses et faits déjà connus ; charger main seulement pour vérifier/désassembler ces offsets.");
 
             if (_sdkPath is not null)
                 report.AppendLine(NsoAnalyzer.Analyze(_sdkPath, sdkOffsets, "sdk"));
             else
-            {
-                report.AppendLine("[SDK] Non chargé. Sans exefs/sdk, le PC sdk+0x16b730 ne peut pas être désassemblé.");
-                if (sdkOffsets.Count > 0) report.AppendLine("Offsets SDK repérés : " + string.Join(", ", sdkOffsets.Select(x => "sdk+0x" + x.ToString("X"))));
-            }
+                report.AppendLine("\n[SDK] Non chargé. Les résultats antérieurs sur GetTlsValue et TlsManager restent affichés ; charger sdk uniquement pour une nouvelle vérification du binaire.");
 
             report.AppendLine();
-            report.AppendLine("[CORRÉLATION TLS — REPÈRES CONNUS]");
-            report.AppendLine("GetTlsValue : sdk+0x16B730 ; wrapper AllocateTlsSlot : sdk+0x16B670.");
-            report.AppendLine("TlsManager::SearchUnusedTlsSlotUnsafe : sdk+0x16C520 ; constructeurs TlsManager : sdk+0x16C7B0 ; AllocateTlsSlot : sdk+0x16CC30.");
-            report.AppendLine("Ces repères ne sont appliqués qu'au binaire SDK fourni : vérifier que sa version correspond à celle du log.");
+            report.AppendLine("[MODE D'EMPLOI]");
+            report.AppendLine("Le log, main et sdk sont désormais facultatifs. Commencer par lire le profil préchargé. Ajouter seulement le fichier nécessaire à la question en cours. L'application analyse localement les fichiers choisis et ne les téléverse pas.");
+            report.AppendLine("Important : le profil embarque les résultats déjà communiqués, mais il ne contient pas les octets complets du log original. Pour vérifier un nouvel événement précis du log, ajouter le fichier local.");
             report.AppendLine();
-            report.AppendLine("Limites : le décodeur embarqué reconnaît certaines familles ARM64, pas toutes les instructions. Il ne décode pas les tables ELF de symboles/relocations ni le code hôte x86-64 généré. Les occurrences de chaînes sont des indices, pas des preuves d'exécution.");
+            report.AppendLine("Limites techniques : décodeur ARM64 partiel ; pas de désassemblage x86-64 du code hôte recompilé ni de reconstruction complète ELF/dynsym/relocations. Une hypothèse ne devient pas une cause racine sans validation dynamique.");
             _lastReport = report.ToString();
             ReportBox.Text = _lastReport;
         }
@@ -103,7 +114,7 @@ public partial class MainWindow : Window
 
     private void Export_Click(object sender, RoutedEventArgs e)
     {
-        var d = new SaveFileDialog { Title = "Exporter le rapport complet", Filter = "Rapport texte|*.txt", FileName = "OrbitalsCrashReport.txt" };
+        var d = new SaveFileDialog { Title = "Exporter le rapport complet", Filter = "Rapport texte|*.txt", FileName = "OrbitalsCrashReport_TLS.txt" };
         if (d.ShowDialog() != true) return;
         File.WriteAllText(d.FileName, _lastReport, new UTF8Encoding(false));
         MessageBox.Show(this, "Rapport exporté.", "Orbitals Crash Analyzer", MessageBoxButton.OK, MessageBoxImage.Information);
