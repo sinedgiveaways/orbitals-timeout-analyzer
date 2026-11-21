@@ -59,11 +59,11 @@ Les occurrences globales montrent que cette position de frame est réutilisée c
 
 Ces résultats montrent plusieurs usages de pointeurs/cursors et même une interprétation scalaire du même offset de frame dans des fonctions distinctes. Ils ne prouvent pas que les pointeurs rechargés dans ces autres fonctions sont celui consommé à `main_main_0184.o+0x1950E`.
 
-## 4. Séparation indispensable : stride 0xE8 vs stride 0x38
+## 4. Deux strides imbriqués : 0xE8 extérieur et 0x38 intérieur
 
-Une analyse ARM64 distincte avait décrit une collection de stride `0xE8` (index `k`, bitmap de présence, champ `[element+0xD8]`, pointeur `x27`). Elle a identifié un scénario statique pouvant calculer `0x104` lorsque `edx=-1` et `[x27]=0`. Cependant, aucun lien de flux de données n'a été établi entre cette collection ARM64 et l'objet/slot hôte consommé à `.text+0x1952F`.
+Il ne faut pas opposer les deux valeurs : elles décrivent deux niveaux de la chaîne. À `0x18F5C`, le code place dans `[rsi+0xD8]` l'adresse d'un enregistrement extérieur calculée comme `base + index*0xE8`. Le bloc de secours charge ce pointeur extérieur dans `rax`, puis son premier QWORD dans `rcx`. Ce premier QWORD est la base d'une structure intérieure, consultée à `0x1952F` avec le stride `(2-edx)*0x38` et le champ `+0x5C`.
 
-Il faut donc traiter cette analyse `0xE8` comme une piste distincte non corrélée, et non comme la description prouvée de la structure lue par le consommateur `0x38`. La piste de course sur bitmap/initialisation reste une hypothèse non démontrée.
+L'analyse ARM64 de la sélection par index `k`, bitmap de présence, et élément `data+k*0xE8` décrit le niveau extérieur et est compatible avec cette chaîne. Les conditions statiques relevées — bit de présence actif, `[element+0xD8] == 0xFFFFFFFF`, absence de correspondance et premier QWORD nul (`[x27]=0`) — peuvent expliquer le calcul `0x104` si elles correspondent au même chemin dynamique. Elles ne sont toutefois pas une capture runtime synchronisée. La course de publication du bitmap avant initialisation du premier QWORD reste une hypothèse, pas une cause démontrée.
 
 ## 5. Limites et état final
 
@@ -77,8 +77,8 @@ Il faut donc traiter cette analyse `0xE8` comme une piste distincte non corrél�
 Aucune préparation, génération ou recompilation du jeu n'est nécessaire pour conserver ou poursuivre cette analyse.
 
 
-## Addendum — granular provenance results recovered from the submitted chunks
+## Complément — détails des résultats de provenance transmis
 
-The write-through results tagged `PTR_FROM_RSI_D8` include writes at offsets `+0x10`, `+0x18`, `+0x20`, `+0x28`, `+0x30`, `+0x38`, `+0x58` and `+0x60`. The explicitly preserved instruction examples are `0x38309 [rax+0x20]=r13`, `0x3869F [rcx+0x18]=rax`, `0x3888F [r8+0x38]=rdx`, `0x3889A [rdx+0x60]=r13d` (DWORD), and `0x388C7 [rcx+0x58]=rdx`. The supplied snippets also identify `0x24745` as `mov rdx,[rsi+0xD8]` followed by `mov [rdx],rcx`, and `0x38166` as a reload followed at `0x3816D` by `[rax]=r14`. These two offset-zero write-throughs are potential first-QWORD writers in their own contexts, but their destination objects have not been proven to be the outer record selected on the crash path.
+Les résultats d'écriture indirecte étiquetés `PTR_FROM_RSI_D8` comprennent des écritures aux offsets `+0x10`, `+0x18`, `+0x20`, `+0x28`, `+0x30`, `+0x38`, `+0x58` and `+0x60`. Les exemples d'instructions explicitement conservés sont `0x38309 [rax+0x20]=r13`, `0x3869F [rcx+0x18]=rax`, `0x3888F [r8+0x38]=rdx`, `0x3889A [rdx+0x60]=r13d` (DWORD), and `0x388C7 [rcx+0x58]=rdx`. Les extraits identifient également `0x24745` as `mov rdx,[rsi+0xD8]` followed by `mov [rdx],rcx`, and `0x38166` as a reload followed at `0x3816D` by `[rax]=r14`. Ces deux écritures indirectes à l'offset zéro sont des candidats possibles pour écrire le premier QWORD dans leurs contextes respectifs, mais rien ne prouve que leurs destinations soient l'enregistrement extérieur sélectionné sur le chemin du crash.
 
-At `0x4CC32`, the preserved sequence is `movsxd r8,dword ptr [rsi+0xD8]`, then `imul r8,rdx`, followed by stores through the computed offset at `[r8+rcx]`, `[r8+rcx+8]` and `[r8+rcx+0xC]`. This is further evidence that the same frame offset can be a signed scalar in a different function; do not treat every `[rsi+0xD8]` occurrence as the same pointer variable.
+À `0x4CC32`, la séquence conservée est `movsxd r8,dword ptr [rsi+0xD8]`, then `imul r8,rdx`, followed by stores through the computed offset at `[r8+rcx]`, `[r8+rcx+8]` and `[r8+rcx+0xC]`. Cela confirme que le même offset de frame peut être un scalaire signé dans une autre fonction ; il ne faut pas traiter chaque occurrence de `[rsi+0xD8]` comme la même variable pointeur.
