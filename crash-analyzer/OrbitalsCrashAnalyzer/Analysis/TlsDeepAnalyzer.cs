@@ -171,7 +171,7 @@ public static class TlsDeepAnalyzer
         if ((w & 0x9F000000) == 0x90000000)
         {
             ulong imm = ((ulong)((w >> 5) & 0x7FFFF) << 2) | ((w >> 29) & 3);
-            long signed = SignExtend(imm, 21);
+            long signed = SignExtend((uint)imm, 21);
             return unchecked((ulong)((long)(pc & ~0xFFFUL) + (signed << 12)));
         }
         if ((w & 0x7F000000) == 0x11000000 && regs[rn].Value is ulong baseValue)
