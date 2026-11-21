@@ -438,3 +438,28 @@ Ainsi, le QWORD Hunter stride-0xE8 cherchait bien des écritures potentielles du
 Les résultats fournis recensent des écritures via pointeur rechargé aux offsets +0x10, +0x18, +0x20, +0x28, +0x30, +0x38, +0x58 et +0x60. Exemples explicites : 0x38309 [rax+0x20]=r13 ; 0x3869F [rcx+0x18]=rax ; 0x3888F [r8+0x38]=rdx ; 0x3889A [rdx+0x60]=r13d (DWORD) ; 0x388C7 [rcx+0x58]=rdx. Deux écritures à offset zéro sont également relevées dans d'autres contextes : 0x24745 recharge [rsi+0xD8] dans rdx puis écrit [rdx]=rcx ; 0x38166 recharge dans rax, puis 0x3816D écrit [rax]=r14. Elles constituent des pistes possibles pour un premier QWORD, mais aucune preuve ne relie leur destination à l'enregistrement extérieur exact du crash.
 
 À 0x4CC32, [rsi+0xD8] est lu comme DWORD signé via movsxd r8,dword ptr [rsi+0xD8], multiplié par rdx, puis utilisé pour des écritures [r8+rcx], [r8+rcx+8] et [r8+rcx+0xC].
+
+
+## Complément récupéré — six écritures QWORD de main_main_0156.o (21-11-2026)
+
+Les six écritures QWORD doivent être archivées individuellement, pas seulement résumées comme « six stores » :
+
+| Offset dans .text | Destination | Valeur écrite | Provenance connue |
+|---|---|---|---|
+| `0x31AD2` | `[r15+rbx+0x78]` | `0` | base `r15+rbx`, origine rapportée de `r15 = 203295` |
+| `0x31AFE` | `[r15+rbx+0x80]` | `rax` | `[rsi+0x230]` alimente cette valeur |
+| `0x31B...` | `[r15+rbx+0xB8]` | `0` | même base `r15+rbx` |
+| `0x31C...` | `[r15+rbx+0xC0]` | `rax` | `[rsi+0x230]` alimente cette valeur |
+| `0x31C...` | `[r15+rbx+0xC8]` | `0` | même base `r15+rbx` |
+| `0x31D...` | `[r15+rbx+0xD0]` | `rax` | `[rsi+0x230]` alimente cette valeur |
+
+**Limite d'archivage :** les adresses exactes des quatre stores autres que `0x31AD2` et `0x31AFE` n'ont pas été récupérées avec certitude dans l'historique consultable ; les préfixes ci-dessus ne sont pas des adresses complètes et ne doivent pas être utilisés comme telles. Les six destinations/valeurs et les relations de provenance ci-dessus, elles, sont celles rapportées par l'utilisateur.
+
+### Contexte adjacent dans main_main_0156.o
+
+- À `0x31C1C` : `movzx ecx, byte ptr [r15+rbx+0xD8]` (lecture d'un octet dans l'enregistrement).
+- À `0x31C25` : chargement de `[rsi+0xD8]`.
+- À `0x31C3A` : test de `[rdx+0x40]`, branche `jne 0x31C43`; sinon, rechargement de `[rsi+0x58]`.
+- Le rapport reçu précise aussi des rechargements de `[rsi+0xD0]` et `[rsi+0xD8]` dans ce voisinage.
+
+Ces lignes montrent que `main_main_0156.o` manipule un enregistrement basé sur `r15+rbx`, lit son octet `+0xD8`, et utilise plusieurs valeurs provenant de `[rsi+0x230]`. Elles ne prouvent pas que cet enregistrement est celui sélectionné dans `main_main_0184.o`, ni que l'un des six stores initialise le premier QWORD de l'enregistrement extérieur. En particulier, aucun des six stores n'écrit à displacement `+0`.
