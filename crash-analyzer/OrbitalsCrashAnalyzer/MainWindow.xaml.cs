@@ -82,7 +82,7 @@ public partial class MainWindow : Window
             else
             {
                 report.AppendLine("[SDK] Non chargé. Sans exefs/sdk, le PC sdk+0x16b730 ne peut pas être désassemblé.");
-                if (sdkOffsets.Count > 0) report.AppendLine("Offsets SDK repérés : " + string.Join(", ", sdkOffsets.Select(x => "sdk+0x" + x.ToString("X")));
+                if (sdkOffsets.Count > 0) report.AppendLine("Offsets SDK repérés : " + string.Join(", ", sdkOffsets.Select(x => "sdk+0x" + x.ToString("X"))));
             }
 
             report.AppendLine();
