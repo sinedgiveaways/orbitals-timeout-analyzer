@@ -108,3 +108,10 @@ Le rapport ciblé documente aussi les écritures PTR_FROM_RSI_D8 aux offsets +0x
 ## Détails exacts retrouvés — QWORD Hunter 0156.o (21-11-2026)
 
 Le rapport utilisateur identifie six stores QWORD dans `main_main_0156.o` : `[r15+rbx+0x78]=0`, `+0x80=rax`, `+0xB8=0`, `+0xC0=rax`, `+0xC8=0`, `+0xD0=rax`. L'origine rapportée de `r15` est `203295`. `[rsi+0x230]` alimente les valeurs QWORD écrites à `+0x80`, `+0xC0` et `+0xD0`. Contexte voisin : `0x31C1C` lit un octet à `[r15+rbx+0xD8]`, `0x31C25` charge `[rsi+0xD8]`, et `0x31C3A` teste `[rdx+0x40]` avant de recharger `[rsi+0x58]` sur le chemin alternatif. Deux adresses de stores sont confirmées (`0x31AD2`, `0x31AFE`) ; les quatre autres offsets d'instruction exacts ne sont pas récupérés avec certitude. Aucun de ces six stores n'écrit le premier QWORD à displacement zéro.
+
+
+## Points historiques à ne pas perdre — TLS manager et outils (21-11-2026)
+
+- Le wrapper TLS a été décrit comme calculant le manager depuis le global `sdk+0xE6E010`, puis `+0x310`. Le premier scan global/constructeur n'a rien trouvé ; un scan de suivi instruction-par-instruction sur 4 octets a été proposé après une réserve sur l'arrêt anticipé possible de `md.disasm`, mais aucun résultat de suivi n'est conservé. Le zéro statique ne prouve pas un pointeur nul runtime.
+- Valeurs de comparaison précédemment demandées pour l'entrée `GetTlsValue` : `RCX=0`, `R8=0xA8`, `TPIDR_EL0=0xA2003C740`, `TLR=0x7010078000`. Ne pas les présenter comme une capture simultanée au crash.
+- L'historique mentionne les premiers outils Windows 0.2.0/0.3.0 et le probe `OrbitalsTlsCrashProbe` (commit correctif `ab4107c`, six erreurs restantes non confirmées résolues). Ce sont des annonces/états de travail, pas une preuve de build/test réussi. Voir `docs/ENVIRONMENT_AND_BUILD.md`.
