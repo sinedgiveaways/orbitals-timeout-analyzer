@@ -99,11 +99,11 @@ public static class TlsDeepAnalyzer
         return list;
     }
 
-    private static void Dump(List<Seg> segs, ulong address, int before, int after, string title)
+    private static void Dump(List<Seg> segs, ulong address, int before, int after, string title, StringBuilder output)
     {
-        ConsoleWriteHeader(title);
+        output.AppendLine("-- " + title + " --");
         var s = segs.FirstOrDefault(x => address >= x.Mem && address < (ulong)x.Mem + (ulong)x.Data.Length);
-        if (s is null) { output.AppendLine($"{address:X}: hors segments."); return; }
+        if (s is null) { output.AppendLine($"0x{address:X}: hors segments."); return; }
         long center = (long)(address - s.Mem);
         long start = Math.Max(0, center - before) & ~3L;
         long end = Math.Min(s.Data.Length - 4L, center + after) & ~3L;
@@ -116,10 +116,8 @@ public static class TlsDeepAnalyzer
         }
     }
 
-    private static StringBuilder _dump = new();
     private static void TraceArguments(List<Seg> segs, ulong callPc, StringBuilder output)
     {
-        _dump.Clear();
         var s = segs.FirstOrDefault(x => callPc >= x.Mem && callPc < (ulong)x.Mem + (ulong)x.Data.Length);
         if (s is null) { output.AppendLine("Site hors segments."); return; }
         int end = (int)(callPc - s.Mem);
