@@ -93,3 +93,12 @@ La version 0.5.2 ajoute notamment :
 - avertissements explicites sur les valeurs qui ne sont pas capturées.
 
 **Important :** la présence du code source sur GitHub ne prouve pas qu'un artifact Windows 0.5.2 a été compilé, téléversé et testé. Vérifier le workflow et l'artifact avant d'annoncer un exécutable disponible.
+
+
+## Mise à jour runtime — 21-11-2026
+
+Dernier log rapporté : la fenêtre du jeu apparaît noire dès le démarrage, mais l'audio est audible. Le runtime utilise Vulkan mailbox ; le log indique un démarrage invité vers 329 ms, nn::init::Start sdk+0x1374A0, replay NVN asynchrone, appels nvnQueueSubmitCommands / nvnQueueFlush / nvnSyncWait et des probes rom:/Engine/... et rom:/Orbitals/.... Plusieurs Hardware.ini et GameplayTags.ini retournent 0x202. Ces lignes sont consignées comme observations, sans les attribuer au Crash B.
+
+## Suivi de l'analyse Crash B
+
+L'examen des six objets / 12 candidats 0xE8 est déjà terminé selon l'utilisateur. Ne pas redemander ce travail. Les résultats connus restent des écritures DWORD, sans preuve directe de l'écrivain QWORD du premier champ de l'élément. L'analyseur ne doit pas déclencher de rebuild du jeu : travailler sur les logs, NSO et objets existants.
