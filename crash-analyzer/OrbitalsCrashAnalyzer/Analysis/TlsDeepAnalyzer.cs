@@ -156,13 +156,17 @@ public static class TlsDeepAnalyzer
 
     private static ulong? ConstantValue(uint w, ulong pc, (string Text, ulong? Value)[] regs)
     {
-        int rd = (int)(w & 31), rn = (int)((w >> 5) & 31);
+        int rd = (int)(w & 31), rn = (int)((w >> 5) & 31), rm = (int)((w >> 16) & 31);
+        // The trace intentionally tracks only x0-x7. Other registers, SP and XZR
+        // are valid ARM64 operands but are not represented in this small state array.
+        ulong? GetTracked(int register) => register >= 0 && register < regs.Length ? regs[register].Value : null;
+
         if ((w & 0x7F800000) == 0x52800000)
         {
             int shift = (int)((w >> 21) & 3) * 16;
             return ((ulong)((w >> 5) & 0xFFFF)) << shift;
         }
-        if ((w & 0x7F800000) == 0x72800000 && regs[rd].Value is ulong old)
+        if ((w & 0x7F800000) == 0x72800000 && GetTracked(rd) is ulong old)
         {
             int shift = (int)((w >> 21) & 3) * 16;
             ulong mask = 0xFFFFUL << shift;
@@ -174,13 +178,13 @@ public static class TlsDeepAnalyzer
             long signed = SignExtend((uint)imm, 21);
             return unchecked((ulong)((long)(pc & ~0xFFFUL) + (signed << 12)));
         }
-        if ((w & 0x7F000000) == 0x11000000 && regs[rn].Value is ulong baseValue)
+        if ((w & 0x7F000000) == 0x11000000 && GetTracked(rn) is ulong baseValue)
         {
             ulong imm = (w >> 10) & 0xFFF;
             if ((w & (1u << 22)) != 0) imm <<= 12;
             return (w & (1u << 30)) != 0 ? baseValue - imm : baseValue + imm;
         }
-        if ((w & 0x7FE0FC00) == 0x2A000000) return regs[(w >> 16) & 31].Value;
+        if ((w & 0x7FE0FC00) == 0x2A000000) return GetTracked(rm);
         return null;
     }
 
