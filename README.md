@@ -15,3 +15,7 @@ Les documents séparent les faits établis, les hypothèses et les inconnues. Il
 ## Compilation Windows
 
 Le workflow GitHub Actions construit et publie une version autonome pour Windows x64. L'exécutable publié est indépendant du cycle de préparation et de recompilation du jeu Orbitals.
+
+
+- [Rapport ciblé de provenance du pointeur Crash B](docs/CRASH_B_POINTER_PROVENANCE.md)
+- [Résultats QWORD Hunter et 12 candidats Crash B](docs/CRASH_B_CANDIDATES_12.md)
