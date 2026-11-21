@@ -431,3 +431,10 @@ Le rapport ciblé 1–3 pages demandé par l'utilisateur est archivé dans docs/
 La correction ne consiste pas à supprimer le stride 0xE8 : il existe deux niveaux. À 0x18F5C, [rsi+0xD8] reçoit l'adresse d'un enregistrement extérieur calculée comme base + index*0xE8. À 0x19507, ce pointeur extérieur est chargé dans rax ; à 0x1950E, son premier QWORD est chargé dans rcx. Ce premier QWORD est la base d'une structure intérieure, consultée à 0x1952F avec le stride (2-edx)*0x38 et le champ +0x5C.
 
 Ainsi, le QWORD Hunter stride-0xE8 cherchait bien des écritures potentielles du premier champ des enregistrements extérieurs. Son résultat (aucun store QWORD displacement 0 détecté dans les six objets) reste pertinent : il n'a pas trouvé le producteur de ce premier QWORD. Le stride 0x38 décrit uniquement l'indexation de la structure intérieure après le déréférencement. Les résultats ARM64 sur bitmap/index et premier QWORD nul sont compatibles avec le niveau extérieur, mais ne prouvent pas l'état runtime exact ni la course supposée.
+
+
+## Détails complémentaires des occurrences PTR_FROM_RSI_D8
+
+Les résultats fournis recensent des écritures via pointeur rechargé aux offsets +0x10, +0x18, +0x20, +0x28, +0x30, +0x38, +0x58 et +0x60. Exemples explicites : 0x38309 [rax+0x20]=r13 ; 0x3869F [rcx+0x18]=rax ; 0x3888F [r8+0x38]=rdx ; 0x3889A [rdx+0x60]=r13d (DWORD) ; 0x388C7 [rcx+0x58]=rdx. Deux écritures à offset zéro sont également relevées dans d'autres contextes : 0x24745 recharge [rsi+0xD8] dans rdx puis écrit [rdx]=rcx ; 0x38166 recharge dans rax, puis 0x3816D écrit [rax]=r14. Elles constituent des pistes possibles pour un premier QWORD, mais aucune preuve ne relie leur destination à l'enregistrement extérieur exact du crash.
+
+À 0x4CC32, [rsi+0xD8] est lu comme DWORD signé via movsxd r8,dword ptr [rsi+0xD8], multiplié par rdx, puis utilisé pour des écritures [r8+rcx], [r8+rcx+8] et [r8+rcx+0xC].
