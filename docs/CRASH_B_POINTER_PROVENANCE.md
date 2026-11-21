@@ -75,3 +75,10 @@ Il faut donc traiter cette analyse `0xE8` comme une piste distincte non corrél�
 - Les chunks de provenance récupérés vont jusqu'à `.text+0x4CC32`. Aucun marqueur final « FIN DU RAPPORT » n'est présent dans les éléments retrouvés ; ce document consigne donc les résultats connus sans prétendre que le relevé transmis était complet.
 
 Aucune préparation, génération ou recompilation du jeu n'est nécessaire pour conserver ou poursuivre cette analyse.
+
+
+## Addendum — granular provenance results recovered from the submitted chunks
+
+The write-through results tagged `PTR_FROM_RSI_D8` include writes at offsets `+0x10`, `+0x18`, `+0x20`, `+0x28`, `+0x30`, `+0x38`, `+0x58` and `+0x60`. The explicitly preserved instruction examples are `0x38309 [rax+0x20]=r13`, `0x3869F [rcx+0x18]=rax`, `0x3888F [r8+0x38]=rdx`, `0x3889A [rdx+0x60]=r13d` (DWORD), and `0x388C7 [rcx+0x58]=rdx`. The supplied snippets also identify `0x24745` as `mov rdx,[rsi+0xD8]` followed by `mov [rdx],rcx`, and `0x38166` as a reload followed at `0x3816D` by `[rax]=r14`. These two offset-zero write-throughs are potential first-QWORD writers in their own contexts, but their destination objects have not been proven to be the outer record selected on the crash path.
+
+At `0x4CC32`, the preserved sequence is `movsxd r8,dword ptr [rsi+0xD8]`, then `imul r8,rdx`, followed by stores through the computed offset at `[r8+rcx]`, `[r8+rcx+8]` and `[r8+rcx+0xC]`. This is further evidence that the same frame offset can be a signed scalar in a different function; do not treat every `[rsi+0xD8]` occurrence as the same pointer variable.
