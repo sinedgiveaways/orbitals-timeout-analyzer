@@ -98,3 +98,8 @@ Le rapport principal demandé est court (1–3 pages) et centré sur les écritu
 ## Clarification des strides — 21-11-2026
 
 Les strides 0xE8 et 0x38 ne sont pas contradictoires : [rsi+0xD8] désigne un enregistrement extérieur sélectionné avec stride 0xE8 (écriture à 0x18F5C). Le premier QWORD de cet enregistrement fournit la base d'une structure intérieure, consultée à 0x1952F avec stride 0x38 et champ +0x5C. Le scan QWORD six objets cherchait donc notamment le writer du premier QWORD extérieur ; aucun store QWORD displacement 0 n'a été trouvé dans ces six fichiers. Voir le rapport ciblé pour la chaîne complète.
+
+
+## Compléments archivés — 21-11-2026
+
+Le rapport ciblé documente aussi les écritures PTR_FROM_RSI_D8 aux offsets +0x10/+0x18/+0x20/+0x28/+0x30/+0x38/+0x58/+0x60, deux écritures potentielles à offset zéro (0x24745 et 0x3816D) non corrélées au record du crash, et l'usage scalaire signé de [rsi+0xD8] à 0x4CC32. Le dernier log runtime est maintenant détaillé dans ENVIRONMENT_AND_BUILD.md : flags NVN, recorder, texture aliases, DCC, staging pool, allocations headroom et probes romfs.
