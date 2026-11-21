@@ -102,3 +102,11 @@ Dernier log rapporté : la fenêtre du jeu apparaît noire dès le démarrage, m
 ## Suivi de l'analyse Crash B
 
 L'examen des six objets / 12 candidats 0xE8 est déjà terminé selon l'utilisateur. Ne pas redemander ce travail. Les résultats connus restent des écritures DWORD, sans preuve directe de l'écrivain QWORD du premier champ de l'élément. L'analyseur ne doit pas déclencher de rebuild du jeu : travailler sur les logs, NSO et objets existants.
+
+
+
+## Correction de l'analyse Crash B — 21-11-2026
+
+Le bloc consommateur hôte à main_main_0184.o+.text+0x1952F effectue une consultation avec stride 0x38. Les recherches d'écritures stride 0xE8 concernent une autre piste et ne doivent pas être présentées comme l'origine établie du pointeur fautif. Le QWORD Hunter six objets est déjà terminé ; ne pas le relancer. Les détails et le tableau sont dans docs/CRASH_B_POINTER_PROVENANCE.md.
+
+Des occurrences globales de [rsi+0xD8] dans les chunks reçus montrent des usages de slot/pointeur/cursor et même d'offset DWORD signé dans une autre fonction ; il ne faut pas lui attribuer une sémantique universelle hors de la fonction concernée. Les chunks conservés vont jusqu'à 0x4CC32, sans marqueur de fin de rapport confirmé.
