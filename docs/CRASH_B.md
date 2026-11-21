@@ -349,3 +349,40 @@ Ils ne démontrent toujours pas :
 5. Continuer séparément la recherche des écrivains du premier qword dans les éléments de stride `0xE8` du fichier `main_main_0184.o`.
 
 Ces vérifications doivent réutiliser les binaires et objets déjà présents. Elles ne nécessitent pas de relancer `prepare.py`, la génération ou une recompilation complète.
+
+
+## Mise à jour — résultats complémentaires du 21-11-2026
+
+### Analyse du consommateur : flux de données précisé
+
+L'analyse du désassemblage invité précise les rôles suivants : x23 (+0xB8) pointe vers un tableau de paires de 8 octets ; x24 (+0xC0) est le compteur i ; x22 (+0xB0) est la borne de fin. À 0x18EF8, le second DWORD de la paire fournit l'index k dans x20. x21+0x160 contient le nombre d'éléments, x21+0x158 la base des données et x21+0x178 le bitmap de présence (bitmap inline si le pointeur est nul). Après validation de k (k >= 0, k < count et bit de présence actif), l'élément est à data + k*0xE8.
+
+edx provient du DWORD [element+0xD8], chargé à 0x18F71 ; ce n'est pas une valeur périmée. Le code écrit aussi [element+0xC] à 0x18F79. x27 est établi à partir de l'élément sélectionné ; la branche connue vers 0x1943A vient de 0x18FA8 dans la même itération. Ces observations restent limitées au CFG et aux extraits examinés.
+
+Le chemin vers 0x104 est statiquement compatible avec les conditions simultanées suivantes : (1) bit de présence de k actif ; (2) [element+0xD8] == 0xFFFFFFFF, donc edx == -1 ; (3) bit 0 de x12, valeur chargée depuis [rsi+0x60], actif et ecx > edx ; (4) aucune entrée correspondante trouvée dans la table à +0x50 ; (5) premier QWORD de l'élément, [x27], égal à zéro. Avec [x27]=0 et edx=-1, le calcul (2-edx)*0x38+0x5C donne 0x104. C'est une condition statique compatible, pas une capture runtime.
+
+Les hypothèses restent : publication du bit de présence avant la fin de l'initialisation (course entre threads), index périmé dans la liste, ou entrée absente de la table. Aucune n'est démontrée.
+
+### Étape d'examen des six objets / 12 candidats : déjà effectuée
+
+L'utilisateur a confirmé que l'examen des six objets contenant les 12 candidats 0xE8 a déjà été réalisé. Ne pas redemander cette étape et ne pas la présenter comme la prochaine action. Les 12 instructions répertoriées dans CRASH_B_CANDIDATES_12.md sont des écritures DWORD ; elles ne montrent pas directement l'écriture QWORD du premier champ de l'élément. Le lien entre ces candidats et le pointeur consommé par main_main_0184.o n'est donc pas prouvé. Les sorties complètes de chaque fonction candidate ne sont pas intégralement reproduites ici : ne pas inventer un écrivain ou un constructeur.
+
+### Analyse SDK TLS complémentaire
+
+Les extraits SDK communiqués couvrent AllocateTlsSlot wrapper à sdk+0x16B670 ; GetTlsValue à sdk+0x16B730 ; SearchUnusedTlsSlotUnsafe à sdk+0x16C520 (export vérifié, taille 0x284, recherche de slots 0 à 31) ; constructeurs TlsManager à sdk+0x16C7B0 ; TlsManager::AllocateTlsSlot à sdk+0x16CC30 ; SetZeroToAllThreadsTlsSafe à sdk+0x169A60 ; ThreadManager::CreateThread autour de sdk+0x1693A0 ; ThreadManagerImplByHorizon::CreateThread autour de sdk+0x1701D0 ; zones de publication du pointeur de thread courant autour de sdk+0x1695C0 et sdk+0x170B20. Certains extraits sont partiels et ne démontrent pas que l'allocation TLS échoue ni que le slot TLS est la cause directe de 0x104.
+
+La relocation main 0x900A1C8 est associée à nn::os::AllocateTlsSlot(nn::os::TlsSlot*, void (*)(void*)) (type 0x402, addend nul). L'initialisation passe 0x90100F8 en premier argument et main+0x1A820 en callback. La cellule a une valeur statique initiale 0xFFFFFFFF ; sa valeur après l'appel n'a pas été capturée. L'import SearchUnusedTlsSlotUnsafe est relié à sdk+0x16C520 via la relocation SDK 0xE74F90.
+
+### Dernier runtime communiqué le 21-11-2026
+
+Le dernier log fourni montre une fenêtre de jeu noire avec audio audible. Il mentionne le démarrage invité à environ 329 ms, nn::init::Start sdk+0x1374A0, les initialisations NVN/replay asynchrones et des recherches de fichiers rom:/Engine/... et rom:/Orbitals/.... Plusieurs probes Hardware.ini et GameplayTags.ini retournent 0x202. Ces observations ne suffisent pas à établir un lien causal avec Crash B.
+
+### État de preuve actualisé
+
+- Confirmé statiquement : le chemin de secours lit le premier QWORD de l'élément de stride 0xE8 puis utilise ce pointeur comme base.
+- Confirmé statiquement : un élément présent avec [element+0xD8] == -1 et premier QWORD nul peut conduire au calcul d'adresse 0x104 sous les conditions décrites.
+- Confirmé par l'utilisateur : les six objets / douze candidats ont déjà été examinés ; ne pas refaire cette étape.
+- Non capturé : registres synchronisés au PC hôte fautif, branche exacte prise au runtime, état exact de l'élément à cet instant, valeur runtime de 0x90100F8 après allocation.
+- Non identifié : écrivain QWORD du premier champ de l'élément 0xE8 et cause racine.
+
+La suite doit exploiter les résultats déjà obtenus sur les fonctions candidates et les objets présents localement. Le dépôt ne contient pas les objets COFF locaux ; ne pas prétendre que GitHub Actions a analysé leurs octets.
