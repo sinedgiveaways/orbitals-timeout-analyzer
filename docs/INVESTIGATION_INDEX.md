@@ -81,3 +81,15 @@ CRASH_B.md intègre désormais les précisions du flux de données dans la boucl
 Correction importante : l'examen des six objets et des 12 candidats a déjà été réalisé par l'utilisateur. Cette étape est terminée et ne doit pas être redemandée. Les instructions connues sont des écritures DWORD ; elles ne désignent pas à elles seules l'écrivain du pointeur QWORD à l'offset +0. Les sorties complètes de chaque fonction candidate ne sont pas toutes archivées ici ; ne pas inventer leur conclusion.
 
 La cause racine de Crash B reste non déterminée. Les preuves manquantes sont la branche runtime vers le bloc de secours, les registres hôtes synchronisés au PC fautif, le premier QWORD de l'élément choisi au moment précis du crash et l'état runtime du slot TLS. Toute analyse supplémentaire doit réutiliser les fichiers déjà extraits, sans prepare.py, génération ni recompilation complète.
+
+
+
+## Errata et résultats QWORD Hunter — 21-11-2026
+
+Une correction importante est apportée : le consommateur exact du crash dans main_main_0184.o (.text+0x1952F) utilise un stride **0x38**, et non 0xE8. Il charge [rsi+0xD8], puis le premier QWORD pointé, avant de lire [rcx+(2-edx)*0x38+0x5C]. L'analyse ARM64 de collection stride-0xE8 reste distincte et n'est pas reliée à ce chemin. Voir le rapport ciblé [CRASH_B_POINTER_PROVENANCE.md](CRASH_B_POINTER_PROVENANCE.md).
+
+Le QWORD Hunter sur les six objets est terminé : 0156.o 7 stores stride-E8 / 6 QWORD / 0 disp0 ; 0157.o 3/0/0 ; 0173.o 5/0/0 ; 0184.o 2/0/0 ; 0186.o 3/0/0 ; 0330.o 2/0/0. Aucun store QWORD détecté à displacement zéro d'un élément stride-E8. Cela ne trouve pas le producteur du pointeur consommé à 0x1950E.
+
+Les chunks de provenance [rsi+0xD8] contiennent des write-through et reloads à 0x24745, 0x350F3–0x3816D, 0x38309–0x388C7, 0x39191–0x47095, 0x39DEF, 0x439AF et 0x4CC32. Ils montrent plusieurs usages (dont offset signé dans une autre fonction), sans prouver l'identité du pointeur sur le chemin fautif. Les données reçues vont jusqu'à 0x4CC32 ; aucun « FIN DU RAPPORT » n'a été confirmé.
+
+Le rapport principal demandé est court (1–3 pages) et centré sur les écritures de [rsi+0xD8], l'origine du pointeur chargé, les écritures du premier QWORD et les anomalies ; les détails secondaires restent séparés. Ne pas refaire l'étape des six objets.
