@@ -47,11 +47,11 @@ public partial class MainWindow : Window
     {
         var values = new List<ulong>();
         var seen = new HashSet<ulong>();
-        foreach (Match m in Regex.Matches(text, @"(?i)sdk\\+0x([0-9a-f]+)"))
+        foreach (Match m in Regex.Matches(text, @"(?i)sdk\+0x([0-9a-f]+)"))
             if (ulong.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.HexNumber, null, out var v) && seen.Add(v))
                 values.Add(v);
 
-        bool tlsCrash = Regex.IsMatch(text, @"(?i)GetTlsValue|sdk\\+0x16b730|reading address\\s+0x104");
+        bool tlsCrash = Regex.IsMatch(text, @"(?i)GetTlsValue|sdk\+0x16b730|reading address\\s+0x104");
         if (tlsCrash)
             foreach (ulong v in new ulong[] { 0x16B670, 0x16B730, 0x16C520, 0x16C7B0, 0x16CC30 })
                 if (seen.Add(v)) values.Add(v);
