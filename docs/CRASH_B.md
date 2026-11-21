@@ -249,3 +249,103 @@ Ne pas remplacer une capture manquante par une déduction depuis les registres i
 ## Conclusion actuelle
 
 Le rapport associe le PC hôte `orbitalgame+0x1B5B682F` à la fonction invitée levée `main+0x1759B20`. Le SDK contient un chemin TLS pertinent dans `GetTlsValue`, et des indices runtime montrent des valeurs TPIDR/TLR et des objets thread. L'analyse du COFF `main_main_0184.o` affine désormais le mécanisme mémoire : le bloc de secours sélectionne un élément de stride `0xE8`, charge son premier qword comme pointeur, puis le déréférence à l'offset `+R8+0x5C`. **La cause racine n'est toujours pas prouvée** : il faut encore identifier la branche runtime empruntée et le code qui initialise ce premier qword.
+
+
+## Compléments d'analyse SDK TLS — extraits du 21-11-2026
+
+Cette section ajoute les résultats des inspections SDK faites après la première rédaction du rapport. Elle sépare les faits confirmés des limites des extraits récupérés.
+
+### Import de `AllocateTlsSlot` depuis main
+
+Le code d'initialisation de `main` contient le passage d'adresse suivant :
+
+```asm
+0x14068: adrp x0, #0x9010000
+0x1406C: add  x0, x0, #0xf8       ; x0 = 0x90100F8
+0x14074: adr  x1, #0x1a820
+0x14090: bl   #0x70c2160
+```
+
+La relocation GOT à `main+0x900A1C8` est de type `1026` (`0x402`), addend `0`, symbole :
+
+`_ZN2nn2os15AllocateTlsSlotEPNS0_7TlsSlotEPFvmE`
+
+Nom démanglé : `nn::os::AllocateTlsSlot(nn::os::TlsSlot*, void (*)(void*))`.
+
+Le trampoline appelé à `main+0x70C2160` charge la cible depuis la GOT `0x900A1C8`. Le code d'initialisation passe donc l'adresse `0x90100F8` comme premier argument à l'import `AllocateTlsSlot`, et l'adresse `main+0x1A820` comme second argument. Cela confirme le rôle d'enregistrement d'un slot TLS avec callback dans cette séquence ; cela ne prouve pas encore que l'allocation ou l'initialisation échoue au runtime.
+
+La cellule `main+0x90100F8` a été observée avec une valeur statique initiale `0xFFFFFFFF`. Cette valeur est compatible avec une sentinelle « slot non encore attribué », mais cette interprétation reste une hypothèse tant que le comportement runtime n'est pas capturé.
+
+### Autres imports TLS et relocations GOT
+
+Les relocations GOT suivantes ont été relevées comme type `1026` (`0x402`) avec addend nul :
+
+| GOT main | Symbole |
+|---:|---|
+| `0x900A1C8` | `_ZN2nn2os15AllocateTlsSlotEPNS0_7TlsSlotEPFvmE` |
+| `0x900A1D0` | `_ZN2nn2os11GetHostArgcEv` |
+| `0x900A1D8` | `strcasecmp` |
+| `0x900A1E0` | `_ZN2nn2os11GetHostArgvEv` |
+| `0x900A1E8` | `strncasecmp_l` |
+| `0x900A1F0` | `atoll` |
+
+La table d'import de `main` comporte 1 041 symboles ; la liste des relocations contient 1 471 402 entrées. Ces chiffres décrivent la structure du binaire analysé, pas un indice de corruption à eux seuls.
+
+### Gestionnaire TLS : recherche de slot libre
+
+La relocation GOT `0xE74F90` du SDK pointe vers :
+
+`_ZNK2nn2os6detail10TlsManager25SearchUnusedTlsSlotUnsafeEb`
+
+La relocation est de type `1026`, addend `0`. L'entrée d'export fournie est :
+
+```text
+('_ZNK2nn2os6detail10TlsManager25SearchUnusedTlsSlotUnsafeEb',
+ 18, 2, 1492256, 644)
+```
+
+L'offset décimal `1492256` correspond à `sdk+0x16C520`, avec une taille déclarée de `644` octets (`0x284`).
+
+L'extrait de désassemblage correct de `SearchUnusedTlsSlotUnsafe` a été fourni en deux parties, jusqu'à `sdk+0x16C7AC`. Il montre une recherche de slots libres dans les indices **0 à 31**. Les branches de saturation appellent `sdk+0x852A90`, puis comportent une instruction `udf` si cet appel retourne. La nature exacte du traitement de saturation n'est pas établie ici : `0x852A90` est un trampoline indirect chargeant une cible depuis la zone `0xE71040+`, et la relocation de cette cible n'a pas été documentée dans les extraits disponibles.
+
+**Limite importante :** un premier extrait avait été étiqueté à tort comme provenant de `SearchUnusedTlsSlotUnsafe`, alors qu'il commençait à `sdk+0x16CC80`. L'adresse d'export confirme `sdk+0x16C520` comme adresse correcte de la fonction. Ne pas utiliser le premier extrait mal étiqueté comme preuve de son implémentation.
+
+### Fonctions SDK examinées et limites des extraits
+
+Les adresses suivantes ont été examinées dans les désassemblages fournis :
+
+| Fonction | Adresse SDK | État des éléments conservés |
+|---|---:|---|
+| `AllocateTlsSlot` (wrapper) | `0x16B670` | Extrait fourni ; le wrapper redirige vers la logique du gestionnaire TLS |
+| `GetTlsValue` | `0x16B730` | Séquence décrite plus haut dans ce rapport |
+| `SearchUnusedTlsSlotUnsafe` | `0x16C520` | Extrait en deux parties jusqu'à `0x16C7AC` |
+| Constructeurs `TlsManager` | `0x16C7B0` | Extrait partiel, interrompu vers `0x16C84C` |
+| `TlsManager::AllocateTlsSlot` | `0x16CC30` | Extrait partiel, interrompu vers `0x16CE7C` |
+| `SetZeroToAllThreadsTlsSafe` | `0x169A60` | Extrait partiel, interrompu vers `0x169B3C` |
+| `ThreadManager::CreateThread` | `0x1693A0` | Zone examinée ; ne suffit pas à reconstituer toute l'initialisation TLS |
+| `ThreadManagerImplByHorizon::CreateThread` | `0x1701D0` | Zone examinée ; extrait complet non conservé dans ce rapport |
+| Écriture(s) du pointeur de thread courant | `0x1695C0`, `0x170B20` | Zones examinées ; il faut encore corréler leurs effets au thread qui plante |
+
+Le fait que ces fonctions aient été désassemblées ou repérées ne prouve pas qu'elles sont fautives. Les extraits incomplets ne doivent pas être extrapolés.
+
+### Ce que ces nouveaux éléments changent — et ne changent pas
+
+Ils confirment qu'un appel explicite à `nn::os::AllocateTlsSlot` est préparé dans l'initialisation de `main`, avec une cellule globale située à `0x90100F8` et un callback à `main+0x1A820`. Ils documentent également une recherche de slots libres bornée aux indices 0–31 et les points d'entrée SDK impliqués dans l'allocation et l'initialisation TLS.
+
+Ils ne démontrent toujours pas :
+1. la valeur runtime de `0x90100F8` après l'appel à `AllocateTlsSlot` ;
+2. si l'appel retourne un slot valide ou suit une branche de saturation ;
+3. si le callback `main+0x1A820` est exécuté pour le thread qui plante ;
+4. si `SetZeroToAllThreadsTlsSafe` initialise correctement l'entrée du thread concerné ;
+5. si la lecture à `0x104` provient directement d'un accès TLS ou du chemin de collection décrit dans l'analyse COFF ;
+6. quelle instruction relie précisément les observations SDK et le PC hôte de l'exception.
+
+### Prochaines vérifications ciblées
+
+1. Capturer la valeur de la cellule `main+0x90100F8` avant et après l'appel à `AllocateTlsSlot`.
+2. Capturer le résultat/slot utilisé par `GetTlsValue` (`w0)) et les pointeurs intermédiaires au même instant.
+3. Déterminer si la recherche de slot libre retourne un indice dans `0..31` ou atteint la branche de saturation.
+4. Corréler l'appel au callback `main+0x1A820` et le passage dans `SetZeroToAllThreadsTlsSafe` avec le thread fautif.
+5. Continuer séparément la recherche des écrivains du premier qword dans les éléments de stride `0xE8` du fichier `main_main_0184.o`.
+
+Ces vérifications doivent réutiliser les binaires et objets déjà présents. Elles ne nécessitent pas de relancer `prepare.py`, la génération ou une recompilation complète.
