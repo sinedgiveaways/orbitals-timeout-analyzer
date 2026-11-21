@@ -53,3 +53,12 @@ Pour chaque séquence prioritaire (3–4, 5–6, 9–10 et 11–12), il faut ré
 Puis comparer les champs et le flux de données avec le consommateur dans `main_main_0184.o` à `.text+0x19507–0x1952F`, qui charge un QWORD depuis le début de l'élément sélectionné avant l'accès fautif.
 
 **Contrainte d'accès :** ces six fichiers objets sont uniquement présents sur le PC de l'utilisateur et ne sont pas dans ce dépôt. GitHub ne peut pas lire directement `C:\Users\...\setup-work\obj`. Une action GitHub hébergée ne pourra pas analyser ces objets tant qu'ils ne sont pas fournis au dépôt ou à un runner connecté à la machine locale. Ne pas prétendre que l'analyse complète a été exécutée depuis GitHub.
+
+
+## État de l'étape 3 — examen des six objets : TERMINÉ
+
+L'utilisateur a explicitement confirmé que l'examen des six objets contenant les 12 candidats a déjà été effectué. Cette étape ne doit pas être redemandée ni reproposée comme prochaine étape.
+
+Les 12 instructions ci-dessus restent des écritures DWORD de 4 octets. Elles ne montrent pas directement l'écriture QWORD du premier champ de l'élément base + index*0xE8. Le dossier ne conserve pas ici l'intégralité des désassemblages des fonctions examinées ni une preuve reliant un candidat au pointeur nul consommé dans main_main_0184.o. Aucun candidat ne peut donc être désigné comme constructeur ou écrivain causal sur la seule base de cette liste.
+
+Statut : examen effectué ; lien causal non établi. La suite doit exploiter les conclusions détaillées déjà obtenues localement, sans refaire les scans ni demander de nouveau les mêmes sorties.
