@@ -9,7 +9,7 @@ public static class NsoAnalyzer
 {
     private sealed record Segment(string Name, uint FileOffset, uint MemoryOffset, uint FileSize, uint MemorySize, bool Compressed, byte[] Data);
 
-    public static string Analyze(string path, IEnumerable<ulong>? interestingOffsets = null)
+    public static string Analyze(string path, IEnumerable<ulong>? interestingOffsets = null, string moduleName = "main")
     {
         var file = File.ReadAllBytes(path);
         if (file.Length < 0x30 || Encoding.ASCII.GetString(file, 0, 4) != "NSO0")
@@ -17,7 +17,7 @@ public static class NsoAnalyzer
 
         uint flags = U32(file, 0x0C);
         var output = new StringBuilder();
-        output.AppendLine($"[NSO] {path}");
+        output.AppendLine($"[NSO {moduleName}] {path}");
         output.AppendLine($"Taille fichier : {file.Length:N0} octets | Flags : 0x{flags:X8}");
         var segments = new List<Segment>();
         string[] names = ["text", "rodata", "data"];
@@ -78,18 +78,49 @@ public static class NsoAnalyzer
             output.AppendLine($"  {marker.Name} : {(locations.Count == 0 ? "non trouvé" : string.Join("; ", locations))}");
         }
 
+        output.AppendLine();
+        output.AppendLine($"[SYMBOLES / CHAÎNES — {moduleName}]");
+        string[] needles =
+        [
+            "GetTlsValue", "AllocateTlsSlot", "FreeTlsSlot", "TlsManager",
+            "SearchUnusedTlsSlotUnsafe", "SetZeroToAllThreadsTlsSafe",
+            "InvokeTlsDestructors", "GetUsedTlsSlotCount", "ThreadManager"
+        ];
+        int symbolHits = 0;
+        foreach (var seg in segments)
+        {
+            for (int i = 0; i < seg.Data.Length - 4; i++)
+            {
+                if (seg.Data[i] < 0x20 || seg.Data[i] > 0x7e) continue;
+                int end = i;
+                while (end < seg.Data.Length && end - i < 256 && seg.Data[end] >= 0x20 && seg.Data[end] <= 0x7e) end++;
+                if (end - i >= 4)
+                {
+                    string candidate = Encoding.ASCII.GetString(seg.Data, i, end - i);
+                    if (needles.Any(n => candidate.Contains(n, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        output.AppendLine($"  {seg.Name}+0x{i:X} (module+0x{seg.MemoryOffset + (uint)i:X}): {candidate}");
+                        if (++symbolHits >= 80) break;
+                    }
+                    i = end;
+                }
+            }
+            if (symbolHits >= 80) break;
+        }
+        if (symbolHits == 0) output.AppendLine("Aucune chaîne/symbole TLS lisible détecté dans les segments décompressés.");
+
         // Preserve caller-supplied priority: crash site, LR, then unwind frames.
         // Sorting here used to discard the most useful high offsets before Take(32).
         var offsets = (interestingOffsets ?? []).Distinct().Take(32).ToArray();
         if (offsets.Length > 0)
         {
             output.AppendLine();
-            output.AppendLine("[FENÊTRES ARM64 — ADRESSES main+0x EXTRAITES DU LOG]");
+            output.AppendLine("[FENÊTRES ARM64 — ADRESSES ${moduleName}+0x]");
             output.AppendLine("Dump des mots 32 bits et décodage des branches usuelles. Ce n'est pas un désassembleur complet.");
             foreach (var address in offsets)
             {
                 var seg = segments.FirstOrDefault(s => address >= s.MemoryOffset && address + 4UL <= (ulong)s.MemoryOffset + (ulong)s.Data.Length);
-                if (seg is null) { output.AppendLine($"main+0x{address:X} : hors des segments chargés."); continue; }
+                if (seg is null) { output.AppendLine($"{moduleName}+0x{address:X} : hors des segments chargés."); continue; }
                 int at = checked((int)(address - seg.MemoryOffset));
                 output.AppendLine();
                 output.AppendLine($"-- {seg.Name} autour de main+0x{address:X} --");
@@ -100,7 +131,7 @@ public static class NsoAnalyzer
                 {
                     uint word = U32(seg.Data, p);
                     ulong pc = (ulong)seg.MemoryOffset + (uint)p;
-                    output.AppendLine($"{(p == at ? ">>" : "  ")} main+0x{pc:X}: {word:X8}  {Decode(word, pc)}");
+                    output.AppendLine($"{(p == at ? ">>" : "  ")} {moduleName}+0x{pc:X}: {word:X8}  {Decode(word, pc)}");
                 }
             }
         }
