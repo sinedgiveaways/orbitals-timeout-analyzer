@@ -72,3 +72,12 @@ Le dossier [CRASH_B.md](CRASH_B.md) a été complété avec les derniers résult
 - points d'entrée SDK étudiés pour allocation TLS, mise à zéro des TLS de threads et création de threads, avec indication explicite des extraits partiels.
 
 Ces éléments ne déterminent pas encore la cause racine. Les priorités restent la capture runtime du slot TLS avant/après allocation et l'identification des écrivains du premier qword des éléments de stride `0xE8`. Aucun rebuild complet n'est requis pour ces analyses.
+
+
+## Mise à jour de l'investigation — 21-11-2026
+
+CRASH_B.md intègre désormais les précisions du flux de données dans la boucle de sélection de l'élément 0xE8, les conditions statiques compatibles avec l'adresse 0x104, les hypothèses de concurrence/index/table, les compléments de désassemblage SDK TLS et le dernier runtime noir avec audio et retours 0x202 des probes de fichiers.
+
+Correction importante : l'examen des six objets et des 12 candidats a déjà été réalisé par l'utilisateur. Cette étape est terminée et ne doit pas être redemandée. Les instructions connues sont des écritures DWORD ; elles ne désignent pas à elles seules l'écrivain du pointeur QWORD à l'offset +0. Les sorties complètes de chaque fonction candidate ne sont pas toutes archivées ici ; ne pas inventer leur conclusion.
+
+La cause racine de Crash B reste non déterminée. Les preuves manquantes sont la branche runtime vers le bloc de secours, les registres hôtes synchronisés au PC fautif, le premier QWORD de l'élément choisi au moment précis du crash et l'état runtime du slot TLS. Toute analyse supplémentaire doit réutiliser les fichiers déjà extraits, sans prepare.py, génération ni recompilation complète.
