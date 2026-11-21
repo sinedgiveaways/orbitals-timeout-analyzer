@@ -1,0 +1,27 @@
+name: Build Crash B Pointer Provenance Windows
+on:
+  push:
+    paths:
+      - "tools/crash_b_pointer_provenance_v2/**"
+      - ".github/workflows/build-crash-b-pointer-provenance.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install pyinstaller capstone
+      - name: Build standalone Windows GUI
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name Orbitals_CrashB_Pointer_Provenance tools/crash_b_pointer_provenance_v2/orbitals_crash_b_pointer_provenance_v2.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Orbitals_CrashB_Pointer_Provenance_Windows
+          path: dist/Orbitals_CrashB_Pointer_Provenance.exe
+          if-no-files-found: error
+          retention-days: 30
