@@ -11,3 +11,7 @@ Les résultats de l'investigation sont conservés dans le dossier [docs/](docs/I
 - [Environnement et contraintes de build](docs/ENVIRONMENT_AND_BUILD.md)
 
 Les documents séparent les faits établis, les hypothèses et les inconnues. Ils ne remplacent pas les logs bruts, qui doivent être conservés séparément.
+
+## Compilation Windows
+
+Le workflow GitHub Actions construit et publie une version autonome pour Windows x64. L'exécutable publié est indépendant du cycle de préparation et de recompilation du jeu Orbitals.
