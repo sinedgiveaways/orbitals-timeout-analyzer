@@ -94,7 +94,12 @@ def analyze(code):
         if len(ops)>=2 and ops[0].type==X86_OP_REG:
             dst=regname(x,ops[0].reg)
             src=ops[1]
-            if src.type==X86_OP_MEM:
+            if m=="lea" and src.type==X86_OP_MEM:
+                b,idx,scale,disp=mem_desc(x,src)
+                if b in tracked and not idx:
+                    tracked[dst]=tracked[b]+f" + {disp:+#x}"
+                else: tracked.pop(dst,None)
+            elif src.type==X86_OP_MEM:
                 b,idx,scale,disp=mem_desc(x,src)
                 if b=="rsi" and not idx and disp==0xD8:
                     tracked[dst]="PTR_FROM_RSI_D8"
@@ -107,11 +112,6 @@ def analyze(code):
             elif src.type==X86_OP_REG:
                 sr=regname(x,src.reg)
                 if sr in tracked: tracked[dst]=tracked[sr]
-                else: tracked.pop(dst,None)
-            elif m=="lea" and src.type==X86_OP_MEM:
-                b,idx,scale,disp=mem_desc(x,src)
-                if b in tracked and not idx:
-                    tracked[dst]=tracked[b]+f" + {disp:+#x}"
                 else: tracked.pop(dst,None)
             else:
                 tracked.pop(dst,None)
