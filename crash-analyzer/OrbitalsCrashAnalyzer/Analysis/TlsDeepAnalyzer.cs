@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
+using System.Text.RegularExpressions;
 using K4os.Compression.LZ4;
 
 namespace OrbitalsCrashAnalyzer.Analysis;
