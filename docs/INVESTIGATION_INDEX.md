@@ -93,3 +93,8 @@ Le QWORD Hunter sur les six objets est terminé : 0156.o 7 stores stride-E8 / 6 
 Les chunks de provenance [rsi+0xD8] contiennent des write-through et reloads à 0x24745, 0x350F3–0x3816D, 0x38309–0x388C7, 0x39191–0x47095, 0x39DEF, 0x439AF et 0x4CC32. Ils montrent plusieurs usages (dont offset signé dans une autre fonction), sans prouver l'identité du pointeur sur le chemin fautif. Les données reçues vont jusqu'à 0x4CC32 ; aucun « FIN DU RAPPORT » n'a été confirmé.
 
 Le rapport principal demandé est court (1–3 pages) et centré sur les écritures de [rsi+0xD8], l'origine du pointeur chargé, les écritures du premier QWORD et les anomalies ; les détails secondaires restent séparés. Ne pas refaire l'étape des six objets.
+
+
+## Clarification des strides — 21-11-2026
+
+Les strides 0xE8 et 0x38 ne sont pas contradictoires : [rsi+0xD8] désigne un enregistrement extérieur sélectionné avec stride 0xE8 (écriture à 0x18F5C). Le premier QWORD de cet enregistrement fournit la base d'une structure intérieure, consultée à 0x1952F avec stride 0x38 et champ +0x5C. Le scan QWORD six objets cherchait donc notamment le writer du premier QWORD extérieur ; aucun store QWORD displacement 0 n'a été trouvé dans ces six fichiers. Voir le rapport ciblé pour la chaîne complète.
