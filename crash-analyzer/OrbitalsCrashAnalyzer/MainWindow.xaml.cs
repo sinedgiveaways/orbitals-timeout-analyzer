@@ -65,7 +65,7 @@ public partial class MainWindow : Window
         {
             var report = new StringBuilder();
             report.AppendLine("ORBITALS CRASH ANALYZER — RAPPORT COMPLET");
-            report.AppendLine($"Version : 0.4.0 | Date : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            report.AppendLine($"Version : 0.5.0 | Date : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             report.AppendLine("Aucune préparation, génération ou recompilation du jeu n'est exécutée.");
             report.AppendLine(new string('=', 90));
             report.AppendLine(InvestigationProfile.Render());
@@ -96,6 +96,9 @@ public partial class MainWindow : Window
                 report.AppendLine(NsoAnalyzer.Analyze(_sdkPath, sdkOffsets, "sdk"));
             else
                 report.AppendLine("\n[SDK] Non chargé. Les résultats antérieurs sur GetTlsValue et TlsManager restent affichés ; charger sdk uniquement pour une nouvelle vérification du binaire.");
+
+            report.AppendLine();
+            report.AppendLine(TlsDeepAnalyzer.Analyze(_mainPath, _sdkPath));
 
             report.AppendLine();
             report.AppendLine("[MODE D'EMPLOI]");
