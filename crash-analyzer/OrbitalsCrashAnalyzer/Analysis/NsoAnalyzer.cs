@@ -115,7 +115,7 @@ public static class NsoAnalyzer
         if (offsets.Length > 0)
         {
             output.AppendLine();
-            output.AppendLine("[FENÊTRES ARM64 — ADRESSES ${moduleName}+0x]");
+            output.AppendLine($"[FENÊTRES ARM64 — ADRESSES {moduleName}+0x]");
             output.AppendLine("Dump des mots 32 bits et décodage des branches usuelles. Ce n'est pas un désassembleur complet.");
             foreach (var address in offsets)
             {
@@ -123,7 +123,7 @@ public static class NsoAnalyzer
                 if (seg is null) { output.AppendLine($"{moduleName}+0x{address:X} : hors des segments chargés."); continue; }
                 int at = checked((int)(address - seg.MemoryOffset));
                 output.AppendLine();
-                output.AppendLine($"-- {seg.Name} autour de main+0x{address:X} --");
+                output.AppendLine($"-- {seg.Name} autour de {moduleName}+0x{address:X} --");
                 int start = Math.Max(0, at - 16 * 4);
                 int end = Math.Min(seg.Data.Length - 4, at + 8 * 4);
                 start &= ~3;
@@ -136,7 +136,7 @@ public static class NsoAnalyzer
             }
         }
         output.AppendLine();
-        output.AppendLine("Cette recherche de marqueurs est une recherche d'octets bruts : une valeur trouvée peut être une donnée ou une constante. Les fenêtres ARM64 sont limitées aux offsets main+0x du log.");
+        output.AppendLine("Cette recherche de marqueurs est une recherche d'octets bruts : une valeur trouvée peut être une donnée ou une constante. Les fenêtres ARM64 sont limitées aux offsets du module transmis.");
         return output.ToString();
     }
 
