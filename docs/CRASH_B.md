@@ -386,3 +386,41 @@ Le dernier log fourni montre une fenêtre de jeu noire avec audio audible. Il me
 - Non identifié : écrivain QWORD du premier champ de l'élément 0xE8 et cause racine.
 
 La suite doit exploiter les résultats déjà obtenus sur les fonctions candidates et les objets présents localement. Le dépôt ne contient pas les objets COFF locaux ; ne pas prétendre que GitHub Actions a analysé leurs octets.
+
+## ERRATA IMPORTANT — correction de la confusion 0xE8 / 0x38 (21-11-2026)
+
+La section précédente qui présentait le consommateur du crash comme lisant un élément de stride 0xE8 était incorrecte. Elle mélangeait une analyse ARM64 distincte d'une collection stride-0xE8 avec le consommateur hôte exact dans main_main_0184.o.
+
+Le consommateur hôte à .text+0x1952F utilise un **stride 0x38** :
+
+```asm
+0x19507: mov rax, qword ptr [rsi + 0xd8]
+0x1950E: mov rcx, qword ptr [rax]
+0x19519: mov eax, 2
+0x1951E: sub eax, edx
+0x19520: imul r8, rax, 0x38
+0x1952F: mov ecx, dword ptr [rcx + r8 + 0x5c]
+```
+
+La chaîne exacte est [rsi+0xD8] -> [rax] -> rcx, puis lecture [rcx + (2-edx)*0x38 + 0x5C]. La collection ARM64 stride-0xE8 décrite plus haut n'a pas été reliée à ce chemin. Les conditions statiques edx=-1 / [x27]=0 / bitmap actif ne doivent donc pas être présentées comme explication prouvée du crash hôte.
+
+### Résultat final du QWORD Hunter sur les six objets
+
+| Objet | Stores stride 0xE8 | Stores QWORD | QWORD displacement 0 |
+|---|---:|---:|---:|
+| main_main_0156.o | 7 | 6 | 0 |
+| main_main_0157.o | 3 | 0 | 0 |
+| main_main_0173.o | 5 | 0 | 0 |
+| main_main_0184.o | 2 | 0 | 0 |
+| main_main_0186.o | 3 | 0 | 0 |
+| main_main_0330.o | 2 | 0 | 0 |
+
+Dans 0156.o, les deux destinations QWORD exactes conservées sont .text+0x31AD2 -> displacement +0x78 (source zéro) et .text+0x31AFE -> displacement +0x80 (source rax). Les quatre autres détails ne sont pas suffisamment archivés. Aucun des six objets ne montre un QWORD store détecté à displacement 0 d'un élément stride-0xE8. Les douze sites DWORD ne prouvent pas le producteur du pointeur consommé au crash.
+
+### Résultats additionnels QWORD Hunter sur [rsi+0xD8]
+
+Les chunks fournis contiennent aussi des occurrences globales, non encore corrélées au crash : .text+0x24745 recharge [rsi+0xD8] dans rdx puis écrit [rdx]=rcx ; reloads à 0x350F3, 0x351E6, 0x35817, 0x362D7, 0x365F0, 0x36756 et 0x38166 ; à 0x3816D, [rax]=r14 ; autres écritures PTR_FROM_RSI_D8 à 0x38309 (+0x20), 0x3869F (+0x18), 0x3888F (+0x38), 0x3889A (+0x60, DWORD), 0x388C7 (+0x58). Lectures du premier QWORD/déréférencements signalés à 0x365F7, 0x39191, 0x393DD, 0x3967B et 0x47095. À 0x39DE0, écriture [rcx+0xF0], suivie à 0x39DEF du stockage rcx+0xF0 dans [rsi+0xD8]. À 0x439AF, stockage rax+0x4C. À 0x4CC32, movsxd r8,dword ptr [rsi+0xd8] puis multiplication : dans cette autre fonction, le slot est interprété comme offset signé, ce qui confirme que l'offset de frame n'a pas une sémantique globale stable.
+
+Ces références montrent des usages de slot/cursor/pointeur dans d'autres fonctions, pas encore le producteur du pointeur précis lu à 0x1950E. Les données QWORD Hunter disponibles s'arrêtent à 0x4CC32 ; aucun « FIN DU RAPPORT » n'a été retrouvé. Ne pas déclarer l'inventaire complet.
+
+Le rapport ciblé 1–3 pages demandé par l'utilisateur est archivé dans docs/CRASH_B_POINTER_PROVENANCE.md. La cause racine demeure non déterminée.
