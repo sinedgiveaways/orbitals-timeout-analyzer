@@ -130,3 +130,14 @@ Variables/options observées dans la session NVN replay :
 - 11 allocations d'au moins 32 MiB observées sur d'autres threads.
 
 Appels NVN relevés : `nvnQueueSubmitCommands`, `nvnQueueFlush` et `nvnSyncWait`. Le runtime utilise `ORBITALS_VK_PRESENT=mailbox`. Le log montre une fenêtre noire avec audio audible. Ces détails sont conservés comme observations de runtime et ne sont pas attribués causalement à Crash B.
+
+
+## Historique des premiers outils Windows et du probe TLS (contexte historique)
+
+Avant la branche d'analyseur 0.4.x–0.5.2 documentée ci-dessus, les échanges ont mentionné :
+
+- un premier Orbitals Crash Analyzer 0.2.0 annoncé comme exécutable Windows x64 autonome d'environ 64,9 MB, centré sur le log et `main`, sans désassemblage SDK ;
+- une version 0.3.0 annoncée avec chargement log/`main`/`sdk`, décompression NSO LZ4, fenêtres d'instructions ARM64 et marqueurs TLS (`GetTlsValue` `sdk+0x16B730`, `AllocateTlsSlot` `+0x16B670` / `+0x16CC30`, `SearchUnusedTlsSlotUnsafe` `+0x16C520`, constructeurs `TlsManager` `+0x16C7B0`), export TXT ; ses limites annoncées étaient l'absence d'analyse complète des relocations/symboles ELF et du code hôte généré ;
+- un probe C# `OrbitalsTlsCrashProbe` dont un correctif de syntaxe/interpolation a été associé au commit `ab4107c`, mais les six erreurs restantes n'ont pas été confirmées comme résolues dans l'historique consultable.
+
+Ces mentions retracent les annonces et limites des versions de travail ; elles ne certifient pas à elles seules que chaque binaire a été compilé, testé ou distribué. Ne pas confondre ces anciennes versions 0.2.0/0.3.0 avec les versions 0.4.0–0.5.2 du suivi actuel, ni présenter le probe comme validé.
