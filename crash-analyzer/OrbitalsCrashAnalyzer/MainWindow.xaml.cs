@@ -65,7 +65,7 @@ public partial class MainWindow : Window
         {
             var report = new StringBuilder();
             report.AppendLine("ORBITALS CRASH ANALYZER — RAPPORT COMPLET");
-            report.AppendLine($"Version : 0.5.0 | Date : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            report.AppendLine($"Version : 0.5.2 | Date : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             report.AppendLine("Aucune préparation, génération ou recompilation du jeu n'est exécutée.");
             report.AppendLine(new string('=', 90));
             report.AppendLine(InvestigationProfile.Render());
