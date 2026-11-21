@@ -11,7 +11,7 @@ public static class TlsDeepAnalyzer
     public static string Analyze(string? mainPath, string? sdkPath, string? logText = null)
     {
         var b = new StringBuilder();
-        b.AppendLine("========== ANALYSE TLS APPROFONDIE 0.5.0 ==========");
+        b.AppendLine("========== ANALYSE TLS APPROFONDIE 0.5.2 ==========");
         b.AppendLine("Objectif : départager les quatre questions du dossier Crash B à partir des binaires.");
         b.AppendLine("Cette analyse est statique : elle ne prétend pas connaître les registres hôtes au moment exact de l'exception.");
         List<Seg>? main = null, sdk = null;
@@ -28,7 +28,7 @@ public static class TlsDeepAnalyzer
             TraceArguments(main, 0x1750B84, b);
             b.AppendLine();
             b.AppendLine("[A2] Fonction appelée main+0x1759B20 — fenêtre élargie");
-            Dump(main, 0x1759B20, 0x100, 0x180, "fonction levée associée au PC hôte", b);
+            Dump(main, 0x1759B20, 0x100, 0x180, "fonction invitée main+0x1759B20 appelée depuis main+0x1750B84", b);
             b.AppendLine();
             b.AppendLine("[A3] Appels directs vers main+0x1759B20");
             FindBranches(main, 0x1759B20, b);
@@ -52,14 +52,16 @@ public static class TlsDeepAnalyzer
         else b.AppendLine("\n[SDK] Non fourni : les chemins internes du SDK ne peuvent pas être confirmés dans ce passage.");
 
         b.AppendLine();
+        AppendCrashBMapping(logText, b);
+        b.AppendLine();
         AppendRuntimeEvidence(logText, b);
 
         b.AppendLine();
         b.AppendLine("[RÉPONSES AUX QUESTIONS]");
-        b.AppendLine("1. Valeur réelle de TlsSlot (w0) au crash : NON DÉMONTRABLE par les seuls binaires. La section A1 donne les dernières définitions statiques de x0-x7 au site main+0x1750B84, mais ce site appelle main+0x1759B20, pas directement GetTlsValue. Les valeurs peuvent dépendre de mémoire et de chemins d'exécution.");
+        b.AppendLine("1. Valeur réelle de TlsSlot (w0) au crash : NON CAPTURÉE. La section A1 donne les dernières définitions statiques de x0-x7 au site main+0x1750B84, mais ce site appelle main+0x1759B20, pas directement GetTlsValue. Les valeurs peuvent dépendre de mémoire et de chemins d'exécution.");
         b.AppendLine("2. Objet thread et couverture du tableau TLS : le binaire permet de vérifier les offsets d'accès, pas l'objet réellement pointé par TPIDRRO_EL0 au crash. Il faut les valeurs runtime déjà journalisées ou une instrumentation ciblée.");
-        b.AppendLine("3. Base nulle côté invité ou introduite par la traduction hôte : le code ARM64 permet de localiser la chaîne d'accès invitée. Sans registres hôtes RCX/R8 et sans état invité synchronisé à l'instruction fautive, cette distinction reste ouverte.");
-        b.AppendLine("4. Slot invalide avant l'appel ou corruption antérieure : une lecture statique peut révéler les validations et écritures visibles, mais ne prouve pas l'état mémoire au moment de l'exécution.");
+        b.AppendLine("3. Base nulle invitée ou introduite par la traduction hôte : NON TRANCHÉ. Les registres hôtes RCX/R8 ne sont pas présents dans le rapport ; ne pas déduire leurs valeurs depuis x0-x7 invités.");
+        b.AppendLine("4. Slot invalide ou corruption antérieure : NON TRANCHÉ. Il faut la valeur du slot et les pointeurs intermédiaires capturés pendant l'exécution.");
         b.AppendLine();
         b.AppendLine("[CE QUE CETTE VERSION APPORTE]");
         b.AppendLine("- Fenêtres ARM64 élargies et décodage des instructions usuelles autour du site d'appel et de la fonction fautive.");
@@ -271,6 +273,27 @@ public static class TlsDeepAnalyzer
         return "instruction ARM64 (non décodée)";
     }
 
+
+    private static void AppendCrashBMapping(string? logText, StringBuilder output)
+    {
+        output.AppendLine("[CORRÉLATION CRASH B — PC HÔTE / FONCTION INVITÉE / SDK TLS]");
+        if (string.IsNullOrWhiteSpace(logText))
+            output.AppendLine("Aucun log chargé : application du dossier déjà établi, sans prétendre relire le PC hôte.");
+        else
+        {
+            var host = Regex.Match(logText, @"(?i)orbitalgame\+0x([0-9a-f]+)");
+            var lifted = Regex.Match(logText, @"(?im)^\s*in lifted function\s+([^\r\n]+)");
+            var read = Regex.Match(logText, @"(?i)reading address\s+(0x[0-9a-f]+)");
+            var guestPc = Regex.Match(logText, @"(?im)^\s*pc\s+(0x[0-9a-f]+)");
+            output.AppendLine(host.Success ? $"PC hôte signalé : orbitalgame+0x{host.Groups[1].Value}" : "PC hôte : non extrait du log.");
+            output.AppendLine(lifted.Success ? $"Fonction invitée levée signalée : {lifted.Groups[1].Value.Trim()}" : "Fonction invitée levée : non extraite du log.");
+            output.AppendLine(read.Success ? $"Adresse lue signalée : {read.Groups[1].Value}" : "Adresse lue : non extraite du log.");
+            output.AppendLine(guestPc.Success ? $"PC invité explicite : {guestPc.Groups[1].Value}" : "PC invité explicite : absent du log (ne pas le confondre avec le PC hôte).");
+        }
+        output.AppendLine("Dossier connu : orbitalgame+0x1B5B682F est associé à la fonction invitée levée main+0x1759B20 ; le site main+0x1750B84 branche vers main+0x1759B20.");
+        output.AppendLine("GetTlsValue (sdk+0x16B730) est un point d'intérêt du chemin TLS, mais le rapport ne démontre PAS que le PC hôte fautif se situe dans cette fonction SDK.");
+        output.AppendLine("Conclusion : PC hôte, fonction invitée levée et fonction SDK TLS sont trois niveaux distincts ; ne pas les fusionner.");
+    }
 
     private static void AppendRuntimeEvidence(string? logText, StringBuilder output)
     {
