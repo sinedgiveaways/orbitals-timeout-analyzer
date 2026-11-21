@@ -36,8 +36,21 @@ Conserver dans le dépôt les faits techniques établis pendant l'analyse des pl
 | Crash B : PC hôte et fonction invitée levée | Corrélation établie dans le rapport |
 | Crash B : GetTlsValue directement fautif | Non démontré |
 | Crash B : valeur réelle de TlsSlot au moment du crash | Non capturée |
+| Crash B : provenance du pointeur dans l'objet COFF | Première analyse locale effectuée ; champ pointeur nul suspecté dans le bloc de secours |
+| Crash B : initialisation du premier qword des éléments de stride 0xE8 | À rechercher |
 | Cause racine Crash B | Non déterminée |
 | Analyseur Windows | Code 0.5.2 présent sur main ; artifact de cette version à vérifier séparément |
+
+## Dernière avancée Crash B — 21-11-2026
+
+L'analyse statique du fichier existant `setup-work/obj/main_main_0184.o` a localisé :
+- l'écriture de `[rsi+0xD8]` à `0x18F5C`, avec une adresse d'élément calculée comme `base + index*0xE8` ;
+- le bloc de secours `0x19507`, qui lit le premier qword de cet élément puis utilise ce qword comme base d'une lecture à `[base + R8 + 0x5C]` ;
+- deux branches directes vers ce bloc : compteur de collection nul (`0x19473`) ou parcours atteignant la sentinelle `0x50` sans correspondance (`0x194A4`).
+
+Le mécanisme est compatible avec un premier qword nul dans l'élément sélectionné, ce qui explique une lecture proche de zéro telle que `0x104`. Cela ne prouve pas encore quelle branche est prise au runtime, ni où le champ est initialisé. Le détail, les limites du CFG local et les extraits assembleur sont dans [CRASH_B.md](CRASH_B.md).
+
+**Prochaine étape :** analyser les objets déjà présents dans `setup-work/obj` pour retrouver les écritures au début des enregistrements de stride `0xE8` et les fonctions qui construisent/remplissent la collection. Ne pas relancer `prepare.py` ou une recompilation complète.
 
 ## Limite de cette sauvegarde
 
