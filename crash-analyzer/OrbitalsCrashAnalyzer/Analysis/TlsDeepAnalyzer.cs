@@ -92,7 +92,7 @@ public static class TlsDeepAnalyzer
             byte[] data;
             if ((flags & (1u << i)) != 0)
             {
-                data = new byte[ms];
+                data = new byte[checked((int)ms)];
                 int n = LZ4Codec.Decode(packed, 0, packed.Length, data, 0, data.Length);
                 if (n != data.Length) throw new InvalidDataException($"Décompression incomplète : {names[i]} ({n}/{data.Length})");
             }
@@ -150,7 +150,6 @@ public static class TlsDeepAnalyzer
         if ((w & 0x9F000000) == 0x90000000 || (w & 0x9F000000) == 0x10000000) return (int)(w & 31);
         if (((w & 0x3B000000) == 0x39000000 || (w & 0x3B200C00) == 0x38200800) && (w & (1u << 22)) != 0) return (int)(w & 31);
         if ((w & 0x1F200000) == 0x0B000000) return (int)(w & 31);
-        if ((w & 0x7FE0FC00) == 0x2A000000) return (int)(w & 31);
         if ((w & 0x7FE0FC00) == 0x2A000000) return (int)(w & 31);
         return -1;
     }
@@ -279,7 +278,7 @@ public static class TlsDeepAnalyzer
         }
         var lines = logText.Replace("\r", "").Split('\n');
         var pattern = new System.Text.RegularExpressions.Regex(
-            @"(?i)(?:\\b(?:x[0-7]|w0|rcx|r8|rdx|rax|tpidr(?:ro)?_el0|tlr)\\s*[=:]|GetTlsValue entry|guest thread=|host instruction:|reading address\\s+0x104)");
+            @"(?i)(?:\b(?:x[0-7]|w0|rcx|r8|rdx|rax|tpidr(?:ro)?_el0|tlr)\s*[=:]|GetTlsValue entry|guest thread=|host instruction:|reading address\s+0x104)");
         var hits = lines.Select((line, index) => (line, index))
             .Where(x => pattern.IsMatch(x.line))
             .TakeLast(100).ToArray();
@@ -291,8 +290,8 @@ public static class TlsDeepAnalyzer
         output.AppendLine("Lignes sources correspondantes (numéros conservés ; proximité textuelle ne garantit pas qu'elles décrivent le même instant) :");
         foreach (var hit in hits)
             output.AppendLine($"  L{hit.index + 1}: {hit.line.Trim()}");
-        bool guestArgs = hits.Any(x => System.Text.RegularExpressions.Regex.IsMatch(x.line, @"(?i)\\b(?:x[0-7]|w0)\\s*[=:]"));
-        bool hostArgs = hits.Any(x => System.Text.RegularExpressions.Regex.IsMatch(x.line, @"(?i)\\b(?:rcx|r8)\\s*[=:]"));
+        bool guestArgs = hits.Any(x => System.Text.RegularExpressions.Regex.IsMatch(x.line, @"(?i)\b(?:x[0-7]|w0)\s*[=:]"));
+        bool hostArgs = hits.Any(x => System.Text.RegularExpressions.Regex.IsMatch(x.line, @"(?i)\b(?:rcx|r8)\s*[=:]"));
         output.AppendLine($"Registres invités x0-x7/w0 présents : {(guestArgs ? "oui" : "non")}.");
         output.AppendLine($"Registres hôtes RCX/R8 présents : {(hostArgs ? "oui" : "non")}.");
     }
