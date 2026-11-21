@@ -22,13 +22,13 @@ public static class TlsDeepAnalyzer
         {
             b.AppendLine();
             b.AppendLine("[A] MAIN : SITE D'APPEL ET FONCTION FAUTIVE");
-            Dump(main, 0x1750B84, 0xC0, 0x30, "BL connu vers main+0x1759B20 / préparation des arguments");
+            Dump(main, 0x1750B84, 0xC0, 0x30, "BL connu vers main+0x1759B20 / préparation des arguments", b);
             b.AppendLine();
             b.AppendLine("[A1] Dernière définition statique de x0-x7 avant main+0x1750B84");
             TraceArguments(main, 0x1750B84, b);
             b.AppendLine();
             b.AppendLine("[A2] Fonction appelée main+0x1759B20 — fenêtre élargie");
-            Dump(main, 0x1759B20, 0x100, 0x180, "fonction levée associée au PC hôte");
+            Dump(main, 0x1759B20, 0x100, 0x180, "fonction levée associée au PC hôte", b);
             b.AppendLine();
             b.AppendLine("[A3] Appels directs vers main+0x1759B20");
             FindBranches(main, 0x1759B20, b);
@@ -43,7 +43,7 @@ public static class TlsDeepAnalyzer
             b.AppendLine();
             b.AppendLine("[B] SDK : GETTLSVALUE ET GESTIONNAIRE TLS");
             foreach (var off in new ulong[] { 0x16B670, 0x16B730, 0x16C520, 0x16C7B0, 0x16CC30, 0x16C3A0, 0x16E820, 0x16EF90 })
-                Dump(sdk, off, 0x30, 0x50, $"SDK+0x{off:X}");
+                Dump(sdk, off, 0x30, 0x50, $"SDK+0x{off:X}", b);
             b.AppendLine();
             b.AppendLine("[B1] Références directes à GetTlsValue / AllocateTlsSlot");
             FindBranches(sdk, 0x16B730, b);
@@ -103,7 +103,7 @@ public static class TlsDeepAnalyzer
     {
         ConsoleWriteHeader(title);
         var s = segs.FirstOrDefault(x => address >= x.Mem && address < (ulong)x.Mem + (ulong)x.Data.Length);
-        if (s is null) { ConsoleWriteLine($"{address:X}: hors segments."); return; }
+        if (s is null) { output.AppendLine($"{address:X}: hors segments."); return; }
         long center = (long)(address - s.Mem);
         long start = Math.Max(0, center - before) & ~3L;
         long end = Math.Min(s.Data.Length - 4L, center + after) & ~3L;
@@ -112,10 +112,8 @@ public static class TlsDeepAnalyzer
             uint w = U32(s.Data, (int)p);
             ulong pc = (ulong)s.Mem + (ulong)p;
             string mark = pc == address ? ">>" : "  ";
-            ConsoleWriteLine($"{mark} {s.Name}+0x{pc:X}: {w:X8}  {Decode(w, pc)}");
+            output.AppendLine($"{mark} {s.Name}+0x{pc:X}: {w:X8}  {Decode(w, pc)}");
         }
-        void ConsoleWriteHeader(string x) => _dump.AppendLine("-- " + x + " --");
-        void ConsoleWriteLine(string x) => _dump.AppendLine(x);
     }
 
     private static StringBuilder _dump = new();
