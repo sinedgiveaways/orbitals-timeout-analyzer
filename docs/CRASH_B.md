@@ -343,7 +343,7 @@ Ils ne démontrent toujours pas :
 ### Prochaines vérifications ciblées
 
 1. Capturer la valeur de la cellule `main+0x90100F8` avant et après l'appel à `AllocateTlsSlot`.
-2. Capturer le résultat/slot utilisé par `GetTlsValue` (`w0)) et les pointeurs intermédiaires au même instant.
+2. Capturer le résultat/slot utilisé par `GetTlsValue` (`w0`) et les pointeurs intermédiaires au même instant.
 3. Déterminer si la recherche de slot libre retourne un indice dans `0..31` ou atteint la branche de saturation.
 4. Corréler l'appel au callback `main+0x1A820` et le passage dans `SetZeroToAllThreadsTlsSafe` avec le thread fautif.
 5. Continuer séparément la recherche des écrivains du premier qword dans les éléments de stride `0xE8` du fichier `main_main_0184.o`.
