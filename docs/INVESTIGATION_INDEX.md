@@ -133,3 +133,17 @@ Le détail historique complet de l'allocateur, omis de la première version de `
 - QWORD Writer Hunter : run [44941325433](https://github.com/sinedgiveaways/orbitals-timeout-analyzer/actions/runs/44941325433), succès, commit `0634c2905f457d09d9280bc657fc318c7155e9d9`, artifact ID `14721153910`, 12,454,478 octets.
 
 Les trois runs et leurs jobs ont été relus : statut `success`. Les commits de documentation postérieurs n'ont pas modifié le code de ces exécutables ; cela ne signifie pas que les dernières sources de l'analyseur ont été recompilées sur le dernier commit documentaire.
+
+
+## Corrélation binaire/runtime du 22-11-2026
+
+Un nouveau rapport et les binaires `main` / `sdk` ont été analysés. Le rapport détaillé est [CRASH_B_RUNTIME_2026-11-22.md](CRASH_B_RUNTIME_2026-11-22.md). Points majeurs :
+
+- Le crash du build `0.2.0-g77add3c` montre `RCX=0`, `R8=0xA8`, `RDX=0xFFFFFFFF`, lecture `0x104`, et `x27=0x84017bc00` avec `[x27]=0`.
+- Le désassemblage du binaire `main` confirme le calcul de `x27 = [x21+0x158] + w20*0xE8`, puis le chargement du premier QWORD et la lecture interne à stride `0x38`, champ `+0x5C` (instruction finale à `main+0x175A030`).
+- `x27) est calculé dans la fonction `main+0x1759b20` elle-même ; ne pas attribuer sa construction uniquement aux frames appelantes.
+- La page `0x84017b000) contenant le record a été allouée. Cela ne révèle pas le writer du premier QWORD.
+- `main+0x1784920 / 0x1784ac0` contient un chemin de création/copie E8 qui peut initialiser les 16 premiers octets / copier `0xE0` octets, mais son lien avec le conteneur runtime fautif reste à prouver.
+- Le champ `pc=sdk+0x16b730` du reporter est en désaccord avec les octets hôtes et le code ARM64 consommateur. Garder cette anomalie ouverte ; ne pas conclure que `GetTlsValue` est directement fautif.
+
+**Suite immédiate :** ajouter une capture bornée de `[x21+0x158]`, `w20`, `w8), `x27` et d'un dump de `0x100) octets à `x27`, puis corréler le writer du premier QWORD. Ne pas modifier `thr_new()`, ne pas refaire les six scans QWORD et ne pas lancer de rebuild complet.
