@@ -138,3 +138,29 @@ Le snapshot invité donne `x20=0). Si ce registre est bien conservé depuis la b
 - Capturer les registres ARM64 au PC `main+0x175A030` ou juste avant `main+0x175A01C`, pas seulement le snapshot attaché à `sdk+0x16B730`.
 - Enregistrer séparément l'entrée réelle de `GetTlsValue` pour comprendre pourquoi le reporter associe ce PC à la fonction levée.
 - Ne déduire aucun mapping hôte/invité avant une capture simultanée ou une table de mapping fournie par le recompilateur.
+
+
+## Chaîne statique du producteur candidat — inspection complémentaire du 22-11
+
+Un balayage des instructions `BL` du binaire `main` donne les références directes suivantes :
+
+- `main+0x1784920` est appelé directement à un seul endroit : `main+0x174E4A8`.
+- `main+0x1784AC0` est appelé par `main+0x1784A10`.
+- `main+0x1759B20` est appelé directement à `main+0x1750B84`.
+
+Dans le caller `main+0x174E180`, le chemin vers `main+0x174E4A8` est maintenant mieux compris :
+
+1. `x20) reçoit `x1` à l'entrée de `main+0x174E180` ; le conteneur de records est adressé via `[x20+0x158]`.
+2. Le code parcourt des éléments de stride `0xE8` et compare leur premier QWORD à une clé/pointeur `x8`.
+3. À `main+0x174E1FC`, le local `[x29-0x50]` est initialisé à zéro.
+4. À `main+0x174E20C`, un appel virtuel est effectué via le vtable de `x25`, slot `+0xA8), avec `x1=&[x29-0x50]` et `x2=&[x29-0x54]` comme paramètres de sortie.
+5. Le code recharge cette sortie à `main+0x174E2F0` / `main+0x174E308`. Le chemin de création atteint ensuite `main+0x174E480`, où `x8=[x29-0x50]` est copié dans le premier QWORD du record source sur la pile (`[sp+0xF0]`).
+6. À `main+0x174E4A8`, `x0=x20+0x158`, `x1=sp+0xF0), puis appel de `main+0x1784920`. Cette fonction copie les 16 premiers octets du record source dans le nouvel élément (`ldr q0,[x24]` puis `str q0,[x1]` à `178494C/178495C`).
+
+C'est une chaîne statique cohérente pour créer un élément E8 dont le premier QWORD provient du paramètre de sortie de l'appel virtuel `[vtable(x25)+0xA8]`. **Elle ne prouve pas que ce conteneur est l'instance utilisée par le crash** : dans le consommateur, `x21=x0) et `x0) est reçu du caller `main+0x1750B84`; il faut comparer l'adresse runtime de cet objet avec l'objet `x20) du producteur.
+
+### Conséquence pour la suite
+
+La prochaine capture doit ajouter, sur le chemin producteur `main+0x174E180), l'adresse de `x20), la valeur de `x25), le pointeur écrit dans `[x29-0x50]` par le callback virtuel et l'adresse du record destination. Sur le chemin consommateur `main+0x1759B20), capturer `x21), `[x21+0x158]`, l'index `w20), et `x27`. Si `x20_producteur == x21_consommateur` et que l'adresse de record correspond, le callback `vtable+0xA8` devient le producteur à tracer. Si les objets diffèrent, cette piste n'est pas la source du record fautif.
+
+Le point décisif est donc maintenant la **comparaison des adresses d'instance**, pas une nouvelle recherche générique de stores QWORD. Ne pas relancer le scan des six objets.
