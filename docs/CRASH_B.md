@@ -483,3 +483,8 @@ Voir le rapport complet [CRASH_B_RUNTIME_2026-11-22.md](CRASH_B_RUNTIME_2026-11-
 La page `0x84017b000` contenant le record a bien une allocation runtime journalisée. Le chemin `main+0x1784920 / 0x1784ac0` initialise/cop ie des enregistrements de disposition E8 et constitue un candidat de writer, mais son lien avec le conteneur fautif n'est pas établi. Le champ diagnostic `pc=sdk+0x16b730` reste incohérent avec l'instruction hôte et le code main identifié ; l'entrée GetTlsValue manquante est une piste séparée, pas une preuve de cause TLS.
 
 Prochaine mesure : capturer simultanément `x21`, `w20`, `w8`, `[x21+0x158]`, `x27` et les `0x100` octets à `x27`, puis attribuer l'écriture du premier QWORD. Aucun patch `thr_new()` ni rebuild complet n'est justifié à ce stade.
+
+
+### Erratum de synchronisation des registres — 22-11-2026
+
+Le snapshot invité du log donne `x20=0`, `x21=0xB40012810`, `x25=0xA8`, `x27=0x84017BC00`, `x8=x9=0x3D`, `x3=0xFFFFFFFF`. Le snapshot hôte distinct donne `RCX=0`, `R8=0xA8), `RDX=0xFFFFFFFF`. Aucun mapping hôte↔invité n'est documenté : ne pas assimiler `RDX` à `w8`, ni déduire `w8=-1`. Le champ `pc=sdk+0x16B730` et la fonction levée `main+0x1759B20` ne concordent pas. Le rapprochement entre les deux snapshots et le chemin ARM64 `main+0x175A030` reste donc à synchroniser. Voir `CRASH_B_RUNTIME_2026-11-22.md` pour l'erratum et la capture corrigée.
