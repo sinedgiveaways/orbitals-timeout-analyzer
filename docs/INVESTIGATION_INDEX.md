@@ -157,3 +157,8 @@ Le journal contient deux snapshots séparés : hôte (`RCX=0`, `R8=0xA8, `RDX=0x
 ### Producteur E8 candidat affiné — 22-11-2026
 
 Le désassemblage montre que `main+0x1784920` n'a qu'un appelant direct, `main+0x174E4A8`, dans `main+0x174E180`. Ce chemin construit un record dans le conteneur `[x20+0x158]) : il obtient un pointeur de sortie via un appel virtuel à `vtable(x25)+0xA8, le place comme premier QWORD du record temporaire, puis `1784920` copie les 16 premiers octets dans l'élément E8. Le consommateur `1759B20` reçoit son objet via `1750B84` et utilise `[x21+0x158]). Même offset et même stride, mais identité d'instance non prouvée. **Prochaine étape : comparer les adresses runtime `x20_producteur` et `x21_consommateur`, puis la destination record et le pointeur retourné par le callback.** Détails dans `CRASH_B_RUNTIME_2026-11-22.md`.
+
+
+### Correction du crash reporter — registres non synchronisés
+
+L'inspection du runtime montre que `Cpu.pc` est une cible de dispatch et non le PC exact de chaque instruction ; `lifted_function(rip)` ne renvoie que le début de la fonction hôte levée. De plus, `recomp/regs.py` garde certains registres invités dans des variables locales C et ne les synchronise dans `c->x[]` qu'aux points d'appel/SVC/retour. Le snapshot imprimé par le crash handler peut donc être ancien. Ne pas conclure sur `x20`, `x27` ou le PC invité à partir du dump actuel. Prochaine étape prioritaire : probe ciblé dans le générateur aux sites consommateur `main+0x175a030` et producteur `main+0x174e180`, activé par `ORBITALS_CRASH_B_PROBE=1`, puis une seule exécution runtime. Détails : `CRASH_B_RUNTIME_2026-11-22.md`.
