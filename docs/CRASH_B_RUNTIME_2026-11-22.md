@@ -189,3 +189,39 @@ Ajouter un probe ciblé dans le générateur de code pour les deux fonctions con
 Une stratégie possible est de désactiver les register-locals uniquement dans ces fonctions ciblées, ou d'ajouter un point de synchronisation explicite dans le générateur avant le probe. Ne pas désactiver les register-locals globalement. Le probe doit être activable par `ORBITALS_CRASH_B_PROBE=1` et ne doit rien faire en mode normal.
 
 Après cette correction, une seule exécution permettra de comparer des valeurs invitées cohérentes. Seulement ensuite, si `x20_producteur == x21_consommateur` et que les records correspondent, suivre le callback virtuel. Aucun patch fonctionnel de TLS ou de `thr_new()` avant cette preuve.
+
+
+## Nouveau journal : build 0.2.0-g80c5db8 (orbitals(2).log)
+
+Journal reçu le 22-11-2026 à 22:21 UTC environ, 1 233 103 octets / 17 440 lignes. Le crash reste Crash B : `0xC0000005`, lecture `0x104`, hôte `00007FF9464099AF`, fonction hôte levée `main+0x1759b20`, octets `42 8b 4c 01 5c`. Registres hôtes : `RCX=0`, `R8=0xA8), `RDX=0xFFFFFFFF`, `RDI=0x7001759b20`. Le build a donc reproduit le défaut à la même fonction/instruction hôte, sans correction du crash.
+
+### Nouvelle donnée : dump complet du record E8
+
+Le reporter donne cette fois :
+
+- `x27=0x84014d000`, `[x27]=0` ;
+- `x21=0xb40012810`, base du tableau annoncée `0x84014d000) ;
+- le record est `records[0]` ;
+- la page `0x84014d000` a été allouée par `AllocateMemoryPages` (ligne 16765) ;
+- le dump de `0xE8` octets montre `+0x00..+0x0F` à zéro, alors que de nombreux champs suivants sont non nuls.
+
+Quelques champs du dump brut (ne pas leur attribuer de type sans le layout exact) :
+
+- `+0x10` contient `01 00 00 00 01 00 00 00 01 00 00 00 00 00 00 00` ;
+- `+0x20` contient deux fois le QWORD `0x0000000119454520` ;
+- `+0x38` contient `0x0000000b40012810`, égal à `x21` ;
+- `+0xD0` est nul ; `+0xD8` contient `0x00000003ffffffff` ;
+- `+0xE0` contient `0x000000070009f6c0`.
+
+Le reporter interprète les champs de l'en-tête du tableau comme `count=17179869186` et `cap=60129542147`. Ces valeurs sont suspectes (valeurs 64 bits composites/non plausibles comme des compteurs simples) : **ne pas les prendre pour des count/cap validés** avant de vérifier les offsets et largeurs des champs réels de l'objet `x21`. Le pointeur base et le dump du record sont les éléments les plus solides.
+
+### Ce que cela change
+
+1. Le record n'est pas intégralement zéro ou vierge : son en-tête initial de 16 octets est nul, mais plusieurs champs ultérieurs ont déjà été écrits. Cela rend l'hypothèse d'un record partiellement initialisé ou d'un champ-clef jamais rempli plus précise qu'une simple allocation non initialisée.
+2. Le record fautif est l'élément zéro selon le reporter. Le dump doit être comparé au layout réel du type E8 avant d'identifier le sens du premier QWORD.
+3. `x20=0` apparaît dans le snapshot invité, mais le problème de synchronisation des registres du crash handler demeure : ne pas utiliser cette valeur pour comparer le producteur et le consommateur sans un probe au point d'exécution.
+4. `GetTlsValue entry: no entry captured` et `TPIDR trace: newest 0 of 0` sont encore présents ; cela ne prouve pas que le TLS est la cause du faulting load.
+
+### Prochaine action recommandée
+
+Avant une nouvelle exécution, corriger/valider le reporter pour afficher les champs de `x21` selon leurs tailles et offsets exacts (base, count, capacity, bitmap) et capturer les registres invités synchronisés au point consommateur. Exploiter immédiatement le nouveau dump : rechercher dans le code les écritures du premier QWORD du record, puis comparer l'élément 0 avec le chemin de création `main+0x174e180 -> main+0x1784920`. Ne pas patcher TLS ni `thr_new()` et ne pas lancer un rebuild complet.
