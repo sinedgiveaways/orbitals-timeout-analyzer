@@ -162,3 +162,8 @@ Le désassemblage montre que `main+0x1784920` n'a qu'un appelant direct, `main+0
 ### Correction du crash reporter — registres non synchronisés
 
 L'inspection du runtime montre que `Cpu.pc` est une cible de dispatch et non le PC exact de chaque instruction ; `lifted_function(rip)` ne renvoie que le début de la fonction hôte levée. De plus, `recomp/regs.py` garde certains registres invités dans des variables locales C et ne les synchronise dans `c->x[]` qu'aux points d'appel/SVC/retour. Le snapshot imprimé par le crash handler peut donc être ancien. Ne pas conclure sur `x20`, `x27` ou le PC invité à partir du dump actuel. Prochaine étape prioritaire : probe ciblé dans le générateur aux sites consommateur `main+0x175a030` et producteur `main+0x174e180`, activé par `ORBITALS_CRASH_B_PROBE=1`, puis une seule exécution runtime. Détails : `CRASH_B_RUNTIME_2026-11-22.md`.
+
+
+### Journal 0.2.0-g80c5db8 — record E8 dump ajouté
+
+Le nouveau `orbitals(2).log` reproduit Crash B à `main+0x1759b20`, lecture hôte `0x104`, avec `RCX=0`, `R8=0xA8), `RDX=0xFFFFFFFF`. Nouveau point important : le reporter a dumpé le record `0xE8` à `x27=0x84014d000`, élément 0 du tableau, premier QWORD nul mais nombreux champs ultérieurs non nuls. Les interprétations count/cap imprimées par le reporter sont suspectes et doivent être vérifiées selon les largeurs/offsets réels. Le record est donc partiellement rempli ; le sens du premier QWORD et son writer restent à établir. Détails et bytes dans `CRASH_B_RUNTIME_2026-11-22.md`.
