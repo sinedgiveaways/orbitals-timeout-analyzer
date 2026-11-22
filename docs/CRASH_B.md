@@ -474,3 +474,12 @@ Un échange antérieur précise que le wrapper TLS calcule le pointeur du gestio
 ### Paramètres de comparaison rapportés pour GetTlsValue
 
 Un précédent cadrage d'analyse demandait de comparer l'entrée réelle de `sdk+0x16B730` avec `RCX=0`, `R8=0xA8`, `TPIDR_EL0=0xA2003C740` et `TLR=0x7010078000`. Ces valeurs étaient des paramètres / points de comparaison attendus pour l'analyse, pas une capture simultanée prouvant que tous ces registres avaient ces valeurs au PC du crash. La capture existante du TLS contient bien TPIDR_EL0 et TLR, mais pas une capture complète synchronisée de tous les registres à l'entrée effective de GetTlsValue et au site hôte fautif.
+
+
+## Mise à jour du 22-11-2026 — corrélation binaire/runtime
+
+Voir le rapport complet [CRASH_B_RUNTIME_2026-11-22.md](CRASH_B_RUNTIME_2026-11-22.md). Le nouveau journal confirme `RCX=0`, `R8=0xA8), `RDX=0xFFFFFFFF), lecture `0x104), et `x27=0x84017bc00` avec `[x27]=0`. Le désassemblage du binaire main confirme que `x27) est calculé dans `main+0x1759b20` à partir de `[x21+0x158]` et de l'index `w20) avec stride `0xE8). Le code charge ensuite `[x27]` et calcule une adresse intérieure de stride `0x38), avec champ `+0x5C`; l'instruction ARM64 correspondante est `main+0x175a030`.
+
+La page `0x84017b000` contenant le record a bien une allocation runtime journalisée. Le chemin `main+0x1784920 / 0x1784ac0` initialise/cop ie des enregistrements de disposition E8 et constitue un candidat de writer, mais son lien avec le conteneur fautif n'est pas établi. Le champ diagnostic `pc=sdk+0x16b730` reste incohérent avec l'instruction hôte et le code main identifié ; l'entrée GetTlsValue manquante est une piste séparée, pas une preuve de cause TLS.
+
+Prochaine mesure : capturer simultanément `x21`, `w20`, `w8`, `[x21+0x158]`, `x27` et les `0x100` octets à `x27`, puis attribuer l'écriture du premier QWORD. Aucun patch `thr_new()` ni rebuild complet n'est justifié à ce stade.
