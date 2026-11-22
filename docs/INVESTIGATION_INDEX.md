@@ -147,3 +147,8 @@ Un nouveau rapport et les binaires `main` / `sdk` ont été analysés. Le rappor
 - Le champ `pc=sdk+0x16b730` du reporter est en désaccord avec les octets hôtes et le code ARM64 consommateur. Garder cette anomalie ouverte ; ne pas conclure que `GetTlsValue` est directement fautif.
 
 **Suite immédiate :** ajouter une capture bornée de `[x21+0x158]`, `w20`, `w8), `x27` et d'un dump de `0x100) octets à `x27`, puis corréler le writer du premier QWORD. Ne pas modifier `thr_new()`, ne pas refaire les six scans QWORD et ne pas lancer de rebuild complet.
+
+
+### Erratum registres — 22-11-2026
+
+Le journal contient deux snapshots séparés : hôte (`RCX=0`, `R8=0xA8), `RDX=0xFFFFFFFF`) et invité (`x20=0`, `x21=0xB40012810`, `x25=0xA8), `x27=0x84017BC00`, `x8=x9=0x3D`, `x3=0xFFFFFFFF`). Aucun mapping hôte↔invité synchronisé n'est établi. Ne pas déduire `w8=-1) de `RDX=-1). La prochaine capture doit être prise au PC invité réel du chemin main, séparément d'une capture à l'entrée GetTlsValue. Détails dans `CRASH_B_RUNTIME_2026-11-22.md`.
