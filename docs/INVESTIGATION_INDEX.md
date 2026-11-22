@@ -141,19 +141,19 @@ Un nouveau rapport et les binaires `main` / `sdk` ont été analysés. Le rappor
 
 - Le crash du build `0.2.0-g77add3c` montre `RCX=0`, `R8=0xA8`, `RDX=0xFFFFFFFF`, lecture `0x104`, et `x27=0x84017bc00` avec `[x27]=0`.
 - Le désassemblage du binaire `main` confirme le calcul de `x27 = [x21+0x158] + w20*0xE8`, puis le chargement du premier QWORD et la lecture interne à stride `0x38`, champ `+0x5C` (instruction finale à `main+0x175A030`).
-- `x27) est calculé dans la fonction `main+0x1759b20` elle-même ; ne pas attribuer sa construction uniquement aux frames appelantes.
-- La page `0x84017b000) contenant le record a été allouée. Cela ne révèle pas le writer du premier QWORD.
+- `x27 est calculé dans la fonction `main+0x1759b20` elle-même ; ne pas attribuer sa construction uniquement aux frames appelantes.
+- La page `0x84017b000 contenant le record a été allouée. Cela ne révèle pas le writer du premier QWORD.
 - `main+0x1784920 / 0x1784ac0` contient un chemin de création/copie E8 qui peut initialiser les 16 premiers octets / copier `0xE0` octets, mais son lien avec le conteneur runtime fautif reste à prouver.
 - Le champ `pc=sdk+0x16b730` du reporter est en désaccord avec les octets hôtes et le code ARM64 consommateur. Garder cette anomalie ouverte ; ne pas conclure que `GetTlsValue` est directement fautif.
 
-**Suite immédiate :** ajouter une capture bornée de `[x21+0x158]`, `w20`, `w8), `x27` et d'un dump de `0x100) octets à `x27`, puis corréler le writer du premier QWORD. Ne pas modifier `thr_new()`, ne pas refaire les six scans QWORD et ne pas lancer de rebuild complet.
+**Suite immédiate :** ajouter une capture bornée de `[x21+0x158]`, `w20`, `w8, `x27` et d'un dump de `0x100 octets à `x27`, puis corréler le writer du premier QWORD. Ne pas modifier `thr_new()`, ne pas refaire les six scans QWORD et ne pas lancer de rebuild complet.
 
 
 ### Erratum registres — 22-11-2026
 
-Le journal contient deux snapshots séparés : hôte (`RCX=0`, `R8=0xA8), `RDX=0xFFFFFFFF`) et invité (`x20=0`, `x21=0xB40012810`, `x25=0xA8), `x27=0x84017BC00`, `x8=x9=0x3D`, `x3=0xFFFFFFFF`). Aucun mapping hôte↔invité synchronisé n'est établi. Ne pas déduire `w8=-1) de `RDX=-1). La prochaine capture doit être prise au PC invité réel du chemin main, séparément d'une capture à l'entrée GetTlsValue. Détails dans `CRASH_B_RUNTIME_2026-11-22.md`.
+Le journal contient deux snapshots séparés : hôte (`RCX=0`, `R8=0xA8, `RDX=0xFFFFFFFF`) et invité (`x20=0`, `x21=0xB40012810`, `x25=0xA8, `x27=0x84017BC00`, `x8=x9=0x3D`, `x3=0xFFFFFFFF`). Aucun mapping hôte↔invité synchronisé n'est établi. Ne pas déduire `w8=-1 de `RDX=-1. La prochaine capture doit être prise au PC invité réel du chemin main, séparément d'une capture à l'entrée GetTlsValue. Détails dans `CRASH_B_RUNTIME_2026-11-22.md`.
 
 
 ### Producteur E8 candidat affiné — 22-11-2026
 
-Le désassemblage montre que `main+0x1784920` n'a qu'un appelant direct, `main+0x174E4A8`, dans `main+0x174E180`. Ce chemin construit un record dans le conteneur `[x20+0x158]) : il obtient un pointeur de sortie via un appel virtuel à `vtable(x25)+0xA8), le place comme premier QWORD du record temporaire, puis `1784920` copie les 16 premiers octets dans l'élément E8. Le consommateur `1759B20` reçoit son objet via `1750B84` et utilise `[x21+0x158]). Même offset et même stride, mais identité d'instance non prouvée. **Prochaine étape : comparer les adresses runtime `x20_producteur` et `x21_consommateur`, puis la destination record et le pointeur retourné par le callback.** Détails dans `CRASH_B_RUNTIME_2026-11-22.md`.
+Le désassemblage montre que `main+0x1784920` n'a qu'un appelant direct, `main+0x174E4A8`, dans `main+0x174E180`. Ce chemin construit un record dans le conteneur `[x20+0x158]) : il obtient un pointeur de sortie via un appel virtuel à `vtable(x25)+0xA8, le place comme premier QWORD du record temporaire, puis `1784920` copie les 16 premiers octets dans l'élément E8. Le consommateur `1759B20` reçoit son objet via `1750B84` et utilise `[x21+0x158]). Même offset et même stride, mais identité d'instance non prouvée. **Prochaine étape : comparer les adresses runtime `x20_producteur` et `x21_consommateur`, puis la destination record et le pointeur retourné par le callback.** Détails dans `CRASH_B_RUNTIME_2026-11-22.md`.
