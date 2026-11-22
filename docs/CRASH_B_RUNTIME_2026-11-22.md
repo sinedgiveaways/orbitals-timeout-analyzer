@@ -120,3 +120,21 @@ Conserver une capture d'entrée `GetTlsValue` (w0/TlsSlot, thread, TPIDRRO, TLR,
 - **À corriger dans le diagnostic :** l'étiquette `pc=sdk+0x16b730` ne concorde pas avec l'instruction hôte et le code ARM64 identifié. Le PC direct doit être revalidé avant d'attribuer ce crash à `GetTlsValue`.
 
 Aucun correctif runtime n'est recommandé avant la capture ciblée ci-dessus.
+
+
+## Erratum de synchronisation des registres — 22-11-2026
+
+Relecture directe des lignes 17345–17399 du journal : le snapshot invité indique `x20=0`, `x21=0xB40012810`, `x25=0xA8), `x27=0x84017BC00`, ainsi que `x8=0x3D`, `x9=0x3D`, `x3=0xFFFFFFFF`. Le snapshot hôte, distinct, indique `RCX=0`, `R8=0xA8), `RDX=0xFFFFFFFF`.
+
+**Correction :** il ne faut pas mapper `RDX=0xFFFFFFFF` vers `w8` ni affirmer que `w8=-1`. Le journal ne donne pas de mapping de registres hôte↔invité démontré. De plus, le champ `pc` indique `sdk+0x16B730`, alors que la fonction levée est `main+0x1759B20`; le snapshot invité ne peut donc pas être traité comme un état synchronisé à l'instruction `main+0x175A030` sans valider le reporter.
+
+Ce qui reste robuste : l'hôte calcule bien `RCX + R8 + 0x5C = 0x104), le traceur rapporte `[x27]=0), et le binaire contient le chemin de lecture à stride E8 extérieur / 0x38 intérieur. Le rapprochement des deux est fort, mais la correspondance exacte des registres et du moment de capture reste à prouver.
+
+Le snapshot invité donne `x20=0). Si ce registre est bien conservé depuis la boucle du calculateur, l'expression statique `x27 = [x21+0x158] + w20*0xE8` se réduit à `x27 = [x21+0x158]`. Il faut encore lire réellement `[x21+0x158]` au moment du crash pour le confirmer ; le journal ne le contient pas.
+
+### Capture suivante corrigée
+
+- Capturer ensemble le PC invité effectif, `x21`, `x20`, `x27), `[x21+0x158]`, `[x27]), `[x27+0xD0]`, `[x27+0xD8]), `[x27+0xE0]) et les registres hôtes.
+- Capturer les registres ARM64 au PC `main+0x175A030` ou juste avant `main+0x175A01C`, pas seulement le snapshot attaché à `sdk+0x16B730`.
+- Enregistrer séparément l'entrée réelle de `GetTlsValue` pour comprendre pourquoi le reporter associe ce PC à la fonction levée.
+- Ne déduire aucun mapping hôte/invité avant une capture simultanée ou une table de mapping fournie par le recompilateur.
