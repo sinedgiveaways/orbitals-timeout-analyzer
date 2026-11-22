@@ -164,3 +164,28 @@ C'est une chaîne statique cohérente pour créer un élément E8 dont le premie
 La prochaine capture doit ajouter, sur le chemin producteur `main+0x174E180), l'adresse de `x20), la valeur de `x25), le pointeur écrit dans `[x29-0x50]` par le callback virtuel et l'adresse du record destination. Sur le chemin consommateur `main+0x1759B20), capturer `x21), `[x21+0x158]`, l'index `w20, et `x27`. Si `x20_producteur == x21_consommateur` et que l'adresse de record correspond, le callback `vtable+0xA8` devient le producteur à tracer. Si les objets diffèrent, cette piste n'est pas la source du record fautif.
 
 Le point décisif est donc maintenant la **comparaison des adresses d'instance**, pas une nouvelle recherche générique de stores QWORD. Ne pas relancer le scan des six objets.
+
+
+## Correction majeure : le PC et les registres du crash reporter ne sont pas un snapshot ARM64 synchronisé
+
+Inspection du source runtime de la branche `sinedgiveaways/pmocer-latibro`, branche `copilot/orbital-copilot-analyse`, commit consulté `866c88ce9d0c434ad75226cd9a3a8d22c6bf1015` :
+
+- `runtime/core/boot/main.c`, fonction `crash_handler`, affiche `c->pc` comme PC invité (lignes 298–299), alors que `Cpu.pc` est explicitement décrit dans `runtime/cpu/cpu.h` comme la cible du prochain dispatch indirect, pas comme un compteur de programme maintenu à chaque instruction.
+- Le champ `in lifted function f_...` est obtenu par `lifted_function(rip)` (main.c, lignes 221–242) : il retrouve le début de fonction hôte levée le plus proche avant le RIP, pas l'instruction invitée exacte.
+- Plus important, `recomp/regs.py` indique que le générateur conserve les registres invités les plus utilisés dans des variables locales C (`xN`) et ne les recopie dans `c->x[N]` qu'aux points de synchronisation : appels, SVC, trap, retour et sorties de fonction. Le crash handler qui imprime directement `c->x[]` peut donc afficher des valeurs anciennes pour les registres maintenus dans les variables locales au moment du crash.
+
+Cela explique pourquoi le log peut afficher simultanément `pc=sdk+0x16b730` et `in lifted function main+0x1759b20`, ainsi que pourquoi les registres invités imprimés ne doivent pas être considérés comme synchronisés avec les registres hôtes. **L'ancienne formulation disant que le champ PC est simplement « erroné » était trop catégorique : c'est surtout un champ de dispatch/stale PC, pas le PC exact de l'instruction qui a fauté.**
+
+### Nouvelle priorité : fiabiliser la capture avant de suivre le writer
+
+Ne pas utiliser le snapshot actuel `c->x[]` pour conclure que `x20=0`, que `x27) vaut réellement `0x84017bc00` à l'instruction fautive, ou pour comparer les instances producteur/consommateur. Ces valeurs restent des indices à confirmer.
+
+Ajouter un probe ciblé dans le générateur de code pour les deux fonctions connues :
+
+1. Consommateur `main+0x1759b20) : synchroniser/sauvegarder les registres invités au point juste avant l'instruction `main+0x175a030`, avec PC invité explicite `main+0x175a030`. Capturer `x20`, `x21), `x27), `x8), `x25), `sp), `[x21+0x158]`, `[x27]) et les champs record lisibles.
+2. Producteur `main+0x174e180) : capturer `x20), `x25), la sortie du callback virtuel `vtable+0xa8), l'adresse de destination du record et le premier QWORD copié.
+3. Écrire ces données dans un petit snapshot crash-safe, consultable par `crash_handler`, sans allocations ni locks dans le chemin de crash.
+
+Une stratégie possible est de désactiver les register-locals uniquement dans ces fonctions ciblées, ou d'ajouter un point de synchronisation explicite dans le générateur avant le probe. Ne pas désactiver les register-locals globalement. Le probe doit être activable par `ORBITALS_CRASH_B_PROBE=1` et ne doit rien faire en mode normal.
+
+Après cette correction, une seule exécution permettra de comparer des valeurs invitées cohérentes. Seulement ensuite, si `x20_producteur == x21_consommateur` et que les records correspondent, suivre le callback virtuel. Aucun patch fonctionnel de TLS ou de `thr_new()` avant cette preuve.
