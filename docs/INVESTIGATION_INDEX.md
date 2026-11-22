@@ -152,3 +152,8 @@ Un nouveau rapport et les binaires `main` / `sdk` ont été analysés. Le rappor
 ### Erratum registres — 22-11-2026
 
 Le journal contient deux snapshots séparés : hôte (`RCX=0`, `R8=0xA8), `RDX=0xFFFFFFFF`) et invité (`x20=0`, `x21=0xB40012810`, `x25=0xA8), `x27=0x84017BC00`, `x8=x9=0x3D`, `x3=0xFFFFFFFF`). Aucun mapping hôte↔invité synchronisé n'est établi. Ne pas déduire `w8=-1) de `RDX=-1). La prochaine capture doit être prise au PC invité réel du chemin main, séparément d'une capture à l'entrée GetTlsValue. Détails dans `CRASH_B_RUNTIME_2026-11-22.md`.
+
+
+### Producteur E8 candidat affiné — 22-11-2026
+
+Le désassemblage montre que `main+0x1784920` n'a qu'un appelant direct, `main+0x174E4A8`, dans `main+0x174E180`. Ce chemin construit un record dans le conteneur `[x20+0x158]) : il obtient un pointeur de sortie via un appel virtuel à `vtable(x25)+0xA8), le place comme premier QWORD du record temporaire, puis `1784920` copie les 16 premiers octets dans l'élément E8. Le consommateur `1759B20` reçoit son objet via `1750B84` et utilise `[x21+0x158]). Même offset et même stride, mais identité d'instance non prouvée. **Prochaine étape : comparer les adresses runtime `x20_producteur` et `x21_consommateur`, puis la destination record et le pointeur retourné par le callback.** Détails dans `CRASH_B_RUNTIME_2026-11-22.md`.
