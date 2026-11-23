@@ -167,3 +167,10 @@ L'inspection du runtime montre que `Cpu.pc` est une cible de dispatch et non le 
 ### Journal 0.2.0-g80c5db8 — record E8 dump ajouté
 
 Le nouveau `orbitals(2).log` reproduit Crash B à `main+0x1759b20`, lecture hôte `0x104`, avec `RCX=0`, `R8=0xA8), `RDX=0xFFFFFFFF`. Nouveau point important : le reporter a dumpé le record `0xE8` à `x27=0x84014d000`, élément 0 du tableau, premier QWORD nul mais nombreux champs ultérieurs non nuls. Les interprétations count/cap imprimées par le reporter sont suspectes et doivent être vérifiées selon les largeurs/offsets réels. Le record est donc partiellement rempli ; le sens du premier QWORD et son writer restent à établir. Détails et bytes dans `CRASH_B_RUNTIME_2026-11-22.md`.
+
+
+## Audit consolidé du 23-11-2026
+
+Le rapport [CRASH_B_AUDIT_2026-11-23.md](CRASH_B_AUDIT_2026-11-23.md) corrige les suppositions sur le mapping registres hôte/invité, clarifie la portée réelle de l'instrumentation TLS par thread (commit `9dd31b1`, artifact CI `44900273712`) et distingue les éléments confirmés des captures encore manquantes. Il précise notamment que le message « no entry captured » du build `g80c5db8` ne teste pas cette instrumentation, que son exécution avec `ORBITALS_TLS_DIAG=1` n'est pas encore confirmée et qu'une capture au milieu de `main+0x1759b20`, à `main+0x175A030`, reste nécessaire.
+
+**Priorité immédiate :** réutiliser l'artifact instrumenté déjà téléchargé si ce n'est pas déjà fait, puis obtenir une capture synchronisée au site de lecture fautif et comparer le conteneur/index du consommateur avec le producteur candidat. Aucun scan COFF déjà effectué ni cycle complet `prepare.py` / génération / recompilation ne doit être relancé.
