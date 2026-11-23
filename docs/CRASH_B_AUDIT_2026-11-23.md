@@ -64,9 +64,9 @@ Le build `0.2.0-g80c5db8` de la branche `orbitals-port` utilise encore l'ancien 
 
 ## Producteur candidat
 
-Les fonctions `main+0x174E180`, `main+0x1784920` et `main+0x1784AC0` restent des candidates : elles construisent un enregistrement temporaire, obtiennent un pointeur via un callback virtuel à `vtable+0xA8`,  le stockent en tête de l'enregistrement et copient les premiers 16 octets vers un élément de stride `0xE8`.
+Les fonctions `main+0x174E180`, `main+0x1784920` et `main+0x1784AC0` restent des candidates : elles construisent un enregistrement temporaire, obtiennent un pointeur via un callback virtuel à `vtable+0xA8`, le stockent en tête de l'enregistrement et copient les premiers 16 octets vers un élément de stride `0xE8`.
 
-Le consommateur utilise `x21` et `[x21+0x158]` ; le producteur examiné utilise `x20) et `[x20+0x158]`. L'identité runtime de ces conteneurs, l'index correspondant, le résultat du callback et la destination de la copie ne sont pas encore établis. Il s'agit d'une piste, pas d'un producteur confirmé.
+Le consommateur utilise `x21` et `[x21+0x158]` ; le producteur examiné utilise `x20` et `[x20+0x158]`. L'identité runtime de ces conteneurs, l'index correspondant, le résultat du callback et la destination de la copie ne sont pas encore établis. Il s'agit d'une piste, pas d'un producteur confirmé.
 
 Les scans des six objets COFF et des 12 candidats DWORD, le QWORD Writer Hunter et le Pointer Provenance ont déjà été exécutés. Ne pas relancer ces scans. Les résultats ne désignent pas encore le writer du premier QWORD de l'élément réellement consommé.
 
@@ -75,7 +75,7 @@ Les scans des six objets COFF et des 12 candidats DWORD, le QWORD Writer Hunter 
 La prochaine instrumentation doit capturer au point exact `main+0x175A030`, sur le thread qui plante :
 
 - PC invité et registres ARM64 réellement vivants : `x20`, `x21`, `x27`, `w8`, `x25`, `SP`, `LR` ;
-- `[x21+0x158]`,  l'index `w20`,  `[x27]` et les octets de l'enregistrement extérieur ;
+- `[x21+0x158]`, l'index `w20`, `[x27]` et les octets de l'enregistrement extérieur ;
 - l'adresse effective calculée pour le chargement `[x25+0x5C]` ;
 - un snapshot hôte associé à la même exception, avec RIP et registres hôtes.
 
