@@ -12,7 +12,7 @@ Le crash hôte observé est une lecture à l'adresse `0x104` dans `orbitalgame.d
 mov ecx, [rcx + r8 + 0x5C]
 ```
 
-Avec les registres hôtes du rapport (`RCX=0`, `R8=0xA8`), le calcul donne bien `0 + 0xA8 + 0x5C = 0x104`. `RDX=0xFFFFFFFF` est également rapporté, mais **aucun mapping valide hôte → registres ARM64 invités n'a été établi**. Il est donc incorrect d'en déduire `w8=-1) ou une valeur précise de `w8`.
+Avec les registres hôtes du rapport (`RCX=0`, `R8=0xA8`), le calcul donne bien `0 + 0xA8 + 0x5C = 0x104`. `RDX=0xFFFFFFFF` est également rapporté, mais **aucun mapping valide hôte → registres ARM64 invités n'a été établi**. Il est donc incorrect d'en déduire `w8=-1` ou une valeur précise de `w8`.
 
 Le désassemblage invité identifie dans `main+0x1759B20` le chemin suivant :
 
@@ -29,7 +29,7 @@ main+0x175A02C: umaddl x25, w10, w11, x9
 main+0x175A030: ldr    w9, [x25, #0x5C]
 ```
 
-Le modèle statique comporte deux niveaux : un enregistrement extérieur de stride `0xE8`, puis une structure intérieure pointée par son premier QWORD, indexée avec le stride `0x38`. L'instruction invitée candidate au point de lecture fautif est `main+0x175A030). La correspondance exacte avec l'instruction hôte doit encore être confirmée par une capture synchronisée.
+Le modèle statique comporte deux niveaux : un enregistrement extérieur de stride `0xE8`, puis une structure intérieure pointée par son premier QWORD, indexée avec le stride `0x38`. L'instruction invitée candidate au point de lecture fautif est `main+0x175A030`. La correspondance exacte avec l'instruction hôte doit encore être confirmée par une capture synchronisée.
 
 ## Ce qui est observé mais pas encore prouvé au moment exact du crash
 
@@ -56,7 +56,7 @@ Elle comprend :
 
 Le workflow GitHub Actions `44900273712` a réussi sur ce commit et a produit l'artifact `orbitals-recomp-exe-gpt-sined` (artifact ID `14705487424`, environ 10,4 MB). L'utilisateur a confirmé avoir téléchargé cet artifact.
 
-**Mais l'historique disponible ne confirme pas que cet artifact a été exécuté avec `ORBITALS_TLS_DIAG=1), ni qu'un log résultant a été récupéré.** Une extraction PowerShell antérieure n'a trouvé aucun `*.log` dans le dossier courant ; cela ne prouve pas que le programme instrumenté n'a rien enregistré.
+**Mais l'historique disponible ne confirme pas que cet artifact a été exécuté avec `ORBITALS_TLS_DIAG=1`,  ni qu'un log résultant a été récupéré.** Une extraction PowerShell antérieure n'a trouvé aucun `*.log` dans le dossier courant ; cela ne prouve pas que le programme instrumenté n'a rien enregistré.
 
 Autre limite : cette instrumentation capture l'entrée de la fonction `main+0x1759b20`, pas les registres au milieu de la fonction à `main+0x175A030`. Elle ne répond donc pas à elle seule à la question du registre réellement utilisé lors de la lecture fautive.
 
@@ -64,9 +64,9 @@ Le build `0.2.0-g80c5db8` de la branche `orbitals-port` utilise encore l'ancien 
 
 ## Producteur candidat
 
-Les fonctions `main+0x174E180`, `main+0x1784920` et `main+0x1784AC0` restent des candidates : elles construisent un enregistrement temporaire, obtiennent un pointeur via un callback virtuel à `vtable+0xA8), le stockent en tête de l'enregistrement et copient les premiers 16 octets vers un élément de stride `0xE8`.
+Les fonctions `main+0x174E180`, `main+0x1784920` et `main+0x1784AC0` restent des candidates : elles construisent un enregistrement temporaire, obtiennent un pointeur via un callback virtuel à `vtable+0xA8`,  le stockent en tête de l'enregistrement et copient les premiers 16 octets vers un élément de stride `0xE8`.
 
-Le consommateur utilise `x21) et `[x21+0x158]`; le producteur examiné utilise `x20) et `[x20+0x158]`. L'identité runtime de ces conteneurs, l'index correspondant, le résultat du callback et la destination de la copie ne sont pas encore établis. Il s'agit d'une piste, pas d'un producteur confirmé.
+Le consommateur utilise `x21` et `[x21+0x158]` ; le producteur examiné utilise `x20) et `[x20+0x158]`. L'identité runtime de ces conteneurs, l'index correspondant, le résultat du callback et la destination de la copie ne sont pas encore établis. Il s'agit d'une piste, pas d'un producteur confirmé.
 
 Les scans des six objets COFF et des 12 candidats DWORD, le QWORD Writer Hunter et le Pointer Provenance ont déjà été exécutés. Ne pas relancer ces scans. Les résultats ne désignent pas encore le writer du premier QWORD de l'élément réellement consommé.
 
@@ -75,8 +75,8 @@ Les scans des six objets COFF et des 12 candidats DWORD, le QWORD Writer Hunter 
 La prochaine instrumentation doit capturer au point exact `main+0x175A030`, sur le thread qui plante :
 
 - PC invité et registres ARM64 réellement vivants : `x20`, `x21`, `x27`, `w8`, `x25`, `SP`, `LR` ;
-- `[x21+0x158]), l'index `w20), `[x27]` et les octets de l'enregistrement extérieur ;
-- l'adresse effective calculée pour le chargement `[x25+0x5C]) ;
+- `[x21+0x158]`,  l'index `w20`,  `[x27]` et les octets de l'enregistrement extérieur ;
+- l'adresse effective calculée pour le chargement `[x25+0x5C]` ;
 - un snapshot hôte associé à la même exception, avec RIP et registres hôtes.
 
 Au producteur candidat, capturer séparément `x20`, `x25`, l'adresse de la vtable, la cible du callback `+0xA8`, son résultat, la destination de la copie et le premier QWORD écrit. Comparer ensuite l'identité du conteneur et l'index avec ceux du consommateur.
