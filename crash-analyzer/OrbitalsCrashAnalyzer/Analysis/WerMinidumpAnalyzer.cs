@@ -231,7 +231,7 @@ public static class WerMinidumpAnalyzer
                     ? "Octets à RIP : absents des plages capturées."
                     : "Octets à RIP : " + Convert.ToHexString(codeBytes));
                 output.AppendLine($"RIP relatif à ucrtbase.dll (si base 0x7FFB2D3C0000) : 0x{rip - 0x7FFB2D3C0000:X}");
-                AnalyzeStackCandidates(output, ReadMemory, rsp, modules);
+                AnalyzeStackCandidates(output, ReadMemory, rsp, modules, ranges);
             }
             else output.AppendLine("Contexte CPU AMD64 absent ou RVA invalide.");
         }
@@ -272,29 +272,49 @@ public static class WerMinidumpAnalyzer
 
 
     private static void AnalyzeStackCandidates(StringBuilder output, Func<ulong, int, byte[]?> read,
-        ulong rsp, IReadOnlyList<ModuleRange> modules)
+        ulong rsp, IReadOnlyList<ModuleRange> modules, IReadOnlyList<MemoryRange> ranges)
     {
         output.AppendLine();
         output.AppendLine("[PILE HÔTE — CANDIDATS D'ADRESSES DE RETOUR]");
-        const int before = 0x100;
-        const int after = 0x2000;
+        const ulong before = 0x100;
+        const ulong after = 0x2000;
         if (rsp < before)
         {
             output.AppendLine("RSP trop bas pour lire la fenêtre de pile.");
             return;
         }
 
-        ulong start = rsp - before;
-        byte[]? stack = read(start, before + after);
-        if (stack is null)
+        // Use the captured range containing RSP and clip the requested window to it.
+        // A read spanning beyond the stack descriptor must not discard the valid part.
+        var stackRange = ranges
+            .Where(r => rsp >= r.Start && rsp - r.Start < r.Size)
+            .OrderByDescending(r => r.Size)
+            .FirstOrDefault();
+        if (stackRange is null)
         {
-            output.AppendLine($"Fenêtre de pile non capturée : [0x{start:X}, 0x{start + before + after:X}).");
+            output.AppendLine($"Aucune plage capturée ne contient RSP=0x{rsp:X}.");
             return;
         }
 
-        output.AppendLine($"Fenêtre brute : [0x{start:X}, 0x{start + (ulong)stack.Length:X}) | RSP à +0x{before:X}");
+        ulong start = Math.Max(stackRange.Start, rsp - before);
+        ulong end = Math.Min(stackRange.Start + stackRange.Size, rsp + after);
+        if (end <= start || end - start > 1_048_576)
+        {
+            output.AppendLine($"Plage de pile invalide : [0x{start:X}, 0x{end:X}).");
+            return;
+        }
+
+        byte[]? stack = read(start, (int)(end - start));
+        if (stack is null)
+        {
+            output.AppendLine($"Lecture impossible dans la plage de pile capturée : [0x{start:X}, 0x{end:X}).");
+            return;
+        }
+
+        output.AppendLine($"Plage capturée utilisée : [0x{start:X}, 0x{end:X}) | RSP à +0x{rsp - start:X} | {stack.Length:N0} octets");
         int found = 0;
-        for (int offset = 0; offset <= stack.Length - 8; offset += 8)
+        int firstAligned = (int)((8 - (start & 7)) & 7);
+        for (int offset = firstAligned; offset <= stack.Length - 8; offset += 8)
         {
             ulong value = BitConverter.ToUInt64(stack, offset);
             foreach (var module in modules)
@@ -312,7 +332,7 @@ public static class WerMinidumpAnalyzer
         }
 
         if (found == 0)
-            output.AppendLine("Aucune valeur de la fenêtre ne pointe dans un module déclaré.");
+            output.AppendLine("Aucune valeur de la plage lue ne pointe dans un module déclaré.");
         output.AppendLine($"Candidats trouvés : {found}. Ce balayage brut ne constitue pas un unwind x64 : certains pointeurs peuvent être des données, pas des adresses de retour.");
     }
 
