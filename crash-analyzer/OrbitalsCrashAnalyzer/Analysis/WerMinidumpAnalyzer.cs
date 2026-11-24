@@ -11,6 +11,8 @@ public static class WerMinidumpAnalyzer
     private const uint Signature = 0x504D444D; // MDMP
     private const uint ExceptionStream = 6;
     private const uint Memory64ListStream = 9;
+    private const uint ModuleListStream = 4;
+    private const ulong SuspectIatSlot = 0x7FF6CA527650;
 
     private sealed record MemoryRange(ulong Start, ulong Size, ulong FileOffset);
 
@@ -33,7 +35,7 @@ public static class WerMinidumpAnalyzer
             throw new InvalidDataException("Répertoire des streams minidump invalide.");
 
         output.AppendLine($"Streams : {streamCount} | répertoire : 0x{directoryRva:X}");
-        uint exceptionRva = 0, exceptionSize = 0, memoryRva = 0, memorySize = 0;
+        uint exceptionRva = 0, exceptionSize = 0, memoryRva = 0, memorySize = 0, moduleRva = 0, moduleSize = 0;
         for (uint i = 0; i < streamCount; i++)
         {
             long entry = (long)directoryRva + i * 12L;
@@ -43,6 +45,7 @@ public static class WerMinidumpAnalyzer
             if ((ulong)rva + size > (ulong)fs.Length) continue;
             if (type == ExceptionStream) { exceptionRva = rva; exceptionSize = size; }
             if (type == Memory64ListStream) { memoryRva = rva; memorySize = size; }
+            if (type == ModuleListStream) { moduleRva = rva; moduleSize = size; }
         }
 
         var ranges = new List<MemoryRange>();
@@ -89,6 +92,40 @@ public static class WerMinidumpAnalyzer
             var b = ReadMemory(address, 8);
             return b is null ? null : BitConverter.ToUInt64(b, 0);
         }
+
+        output.AppendLine();
+        output.AppendLine("[MODULES WINDOWS / SLOT INDIRECT CRASH C]");
+        bool suspectModuleFound = false;
+        if (moduleRva != 0 && moduleSize >= 4)
+        {
+            uint moduleCount = ReadU32(br, moduleRva);
+            if (moduleCount <= 100000 && 4UL + (ulong)moduleCount * 108UL <= moduleSize)
+            {
+                output.AppendLine($"ModuleList : {moduleCount} modules");
+                for (uint i = 0; i < moduleCount; i++)
+                {
+                    long m = (long)moduleRva + 4L + i * 108L;
+                    ulong imageBase = ReadU64(br, m);
+                    uint imageSize = ReadU32(br, m + 8);
+                    uint nameRva = ReadU32(br, m + 20);
+                    string moduleName = ReadMinidumpString(br, nameRva, fs.Length);
+                    if (SuspectIatSlot < imageBase || SuspectIatSlot - imageBase >= imageSize) continue;
+                    suspectModuleFound = true;
+                    ulong slotRva = SuspectIatSlot - imageBase;
+                    output.AppendLine($"Slot 0x{SuspectIatSlot:X} appartient à {moduleName}");
+                    output.AppendLine($"  ImageBase=0x{imageBase:X} | SizeOfImage=0x{imageSize:X} | RVA slot=0x{slotRva:X}");
+                    var slotValue = ReadQword(SuspectIatSlot);
+                    output.AppendLine(slotValue.HasValue
+                        ? $"  Valeur capturée du slot : 0x{slotValue.Value:X}"
+                        : "  Valeur du slot : non capturée dans Memory64List");
+                    AnalyzePeSlot(output, ReadMemory, imageBase, imageSize, slotRva);
+                }
+            }
+            else output.AppendLine("ModuleList présent mais taille/compte invalide.");
+        }
+        else output.AppendLine("ModuleList absent : impossible d'associer le slot à un module.");
+        if (!suspectModuleFound)
+            output.AppendLine($"Aucun module déclaré dans le dump ne contient 0x{SuspectIatSlot:X}.");
 
         output.AppendLine();
         output.AppendLine("[EXCEPTION / CONTEXTE HÔTE]");
@@ -171,6 +208,109 @@ public static class WerMinidumpAnalyzer
         }
         output.AppendLine("Les adresses absentes du dump ne sont pas automatiquement considérées invalides : la capture peut être partielle.");
         return output.ToString();
+    }
+
+
+    private static string ReadMinidumpString(BinaryReader br, uint rva, long fileLength)
+    {
+        if (rva == 0 || (ulong)rva + 4 > (ulong)fileLength) return "<nom indisponible>";
+        uint byteLength = ReadU32(br, rva);
+        if (byteLength > 32768 || (ulong)rva + 4UL + byteLength > (ulong)fileLength || (byteLength & 1) != 0)
+            return "<nom invalide>";
+        br.BaseStream.Position = (long)rva + 4;
+        return Encoding.Unicode.GetString(br.ReadBytes((int)byteLength)).TrimEnd('\\0');
+    }
+
+    private static void AnalyzePeSlot(StringBuilder output, Func<ulong, int, byte[]?> read,
+        ulong imageBase, uint imageSize, ulong slotRva)
+    {
+        byte[]? dos = read(imageBase, 64);
+        if (dos is null || dos[0] != (byte)'M' || dos[1] != (byte)'Z')
+        {
+            output.AppendLine("  En-têtes PE DOS non capturés ou invalides : import non résolu.");
+            return;
+        }
+        uint peOffset = BitConverter.ToUInt32(dos, 0x3C);
+        if (peOffset > 0x100000 || peOffset + 24UL > imageSize)
+        {
+            output.AppendLine("  e_lfanew PE invalide.");
+            return;
+        }
+        byte[]? nt = read(imageBase + peOffset, 24);
+        if (nt is null || nt[0] != (byte)'P' || nt[1] != (byte)'E' || nt[2] != 0 || nt[3] != 0)
+        {
+            output.AppendLine("  En-têtes NT PE non capturés ou invalides.");
+            return;
+        }
+        ushort optionalSize = BitConverter.ToUInt16(nt, 20);
+        byte[]? opt = read(imageBase + peOffset + 24, Math.Min(optionalSize, (ushort)240));
+        if (opt is null || opt.Length < 224 || BitConverter.ToUInt16(opt, 0) != 0x20B)
+        {
+            output.AppendLine("  Optional Header PE32+ non capturé ou non AMD64.");
+            return;
+        }
+        uint importRva = BitConverter.ToUInt32(opt, 120);
+        uint importSize = BitConverter.ToUInt32(opt, 124);
+        uint iatRva = BitConverter.ToUInt32(opt, 208);
+        uint iatSize = BitConverter.ToUInt32(opt, 212);
+        output.AppendLine($"  PE32+ : ImportDirectory RVA=0x{importRva:X}/0x{importSize:X} | IAT RVA=0x{iatRva:X}/0x{iatSize:X}");
+        if (slotRva >= iatRva && slotRva - iatRva < iatSize)
+            output.AppendLine($"  Le slot tombe dans la plage IAT déclarée (index {(slotRva - iatRva) / 8}, décalage {(slotRva - iatRva) % 8}).");
+        else
+            output.AppendLine("  Le slot ne tombe pas dans la plage IAT déclarée du PE (ou la plage IAT est absente).");
+        if (importRva == 0 || importSize < 20 || importRva >= imageSize)
+        {
+            output.AppendLine("  Import Directory absente/invalide : nom de fonction non résolu.");
+            return;
+        }
+
+        bool found = false;
+        uint maxDescriptors = Math.Min(importSize / 20, 4096u);
+        for (uint d = 0; d < maxDescriptors; d++)
+        {
+            byte[]? desc = read(imageBase + importRva + d * 20UL, 20);
+            if (desc is null) { output.AppendLine("  Descripteurs d'import non capturés dans le dump."); break; }
+            uint originalThunk = BitConverter.ToUInt32(desc, 0);
+            uint nameRva = BitConverter.ToUInt32(desc, 12);
+            uint firstThunk = BitConverter.ToUInt32(desc, 16);
+            if (originalThunk == 0 && nameRva == 0 && firstThunk == 0) break;
+            string dll = ReadAsciiZ(read, imageBase + nameRva, 260) ?? "<DLL non capturée>";
+            if (firstThunk == 0 || firstThunk >= imageSize) continue;
+            ulong thunkBase = imageBase + (originalThunk != 0 ? originalThunk : firstThunk);
+            for (uint n = 0; n < 65536; n++)
+            {
+                ulong entryRva = (ulong)firstThunk + n * 8UL;
+                if (entryRva + 8 > imageSize) break;
+                byte[]? thunkBytes = read(thunkBase + n * 8UL, 8);
+                if (thunkBytes is null) break;
+                ulong thunk = BitConverter.ToUInt64(thunkBytes, 0);
+                if (thunk == 0) break;
+                if (entryRva != slotRva) continue;
+                found = true;
+                const ulong OrdinalFlag64 = 0x8000000000000000;
+                if ((thunk & OrdinalFlag64) != 0)
+                    output.AppendLine($"  IMPORT IDENTIFIÉ : {dll}!ordinal #{thunk & 0xFFFF}");
+                else if (thunk <= uint.MaxValue)
+                {
+                    string? function = ReadAsciiZ(read, imageBase + thunk + 2, 512);
+                    output.AppendLine($"  IMPORT IDENTIFIÉ : {dll}!{function ?? "<nom non capturé>"}");
+                }
+                else output.AppendLine($"  IAT correspond à {dll}, thunk original hors RVA : 0x{thunk:X}");
+                break;
+            }
+            if (found) break;
+        }
+        if (!found)
+            output.AppendLine("  Aucune entrée d'import ne correspond exactement au slot (import data absente/partielle, slot non-IAT, ou table atypique).");
+    }
+
+    private static string? ReadAsciiZ(Func<ulong, int, byte[]?> read, ulong address, int maxLength)
+    {
+        var bytes = read(address, maxLength);
+        if (bytes is null) return null;
+        int end = Array.IndexOf(bytes, (byte)0);
+        if (end < 0) end = bytes.Length;
+        return Encoding.ASCII.GetString(bytes, 0, end);
     }
 
     private static void DumpBytes(StringBuilder output, Func<ulong, int, byte[]?> read, ulong address, int length, string label)
