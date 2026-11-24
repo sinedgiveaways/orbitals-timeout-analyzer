@@ -109,9 +109,11 @@ public static class WerMinidumpAnalyzer
                 {
                     long t = (long)threadRva + 4L + i * 48L;
                     uint id = ReadU32(br, t);
-                    ulong stackStart = ReadU64(br, t + 32);
-                    uint stackSize = ReadU32(br, t + 40);
-                    uint stackDataRva = ReadU32(br, t + 44);
+                    // MINIDUMP_THREAD layout: Teb at +16, Stack descriptor at +24.
+                    // MINIDUMP_MEMORY_DESCRIPTOR = StartOfMemoryRange (+24), DataSize (+32), Rva (+36).
+                    ulong stackStart = ReadU64(br, t + 24);
+                    uint stackSize = ReadU32(br, t + 32);
+                    uint stackDataRva = ReadU32(br, t + 36);
                     if (stackSize > 0 && (ulong)stackDataRva + stackSize <= (ulong)fs.Length)
                     {
                         // Add explicit thread stack mapping even if it was not in Memory64List.
