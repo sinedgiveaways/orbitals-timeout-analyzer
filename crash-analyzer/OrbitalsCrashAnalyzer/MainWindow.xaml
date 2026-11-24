@@ -75,6 +75,6 @@
                 </ScrollViewer>
             </TabItem>
         </TabControl>
-        <TextBlock Grid.Row="3" Text="Orbitals Crash Analyzer 0.9.0 • Analyse WER / TLS intégrée • Aucun cycle de préparation ou recompilation du jeu" Foreground="#FF718096" Margin="0,12,0,0"/>
+        <TextBlock Grid.Row="3" Text="Orbitals Crash Analyzer 0.10.0 • Analyse WER / TLS intégrée • Aucun cycle de préparation ou recompilation du jeu" Foreground="#FF718096" Margin="0,12,0,0"/>
     </Grid>
 </Window>
