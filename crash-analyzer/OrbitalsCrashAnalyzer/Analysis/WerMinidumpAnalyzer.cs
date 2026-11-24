@@ -15,6 +15,7 @@ public static class WerMinidumpAnalyzer
     private const ulong SuspectIatSlot = 0x7FF6CA527650;
 
     private sealed record MemoryRange(ulong Start, ulong Size, ulong FileOffset);
+    private sealed record ModuleRange(ulong Base, uint Size, string Name);
 
     public static string Analyze(string path)
     {
@@ -49,6 +50,7 @@ public static class WerMinidumpAnalyzer
         }
 
         var ranges = new List<MemoryRange>();
+        var modules = new List<ModuleRange>();
         if (memoryRva != 0 && memorySize >= 16)
         {
             ulong count = ReadU64(br, memoryRva);
@@ -109,6 +111,7 @@ public static class WerMinidumpAnalyzer
                     uint imageSize = ReadU32(br, m + 8);
                     uint nameRva = ReadU32(br, m + 20);
                     string moduleName = ReadMinidumpString(br, nameRva, fs.Length);
+                    modules.Add(new ModuleRange(imageBase, imageSize, moduleName));
                     if (SuspectIatSlot < imageBase || SuspectIatSlot - imageBase >= imageSize) continue;
                     suspectModuleFound = true;
                     ulong slotRva = SuspectIatSlot - imageBase;
@@ -173,6 +176,7 @@ public static class WerMinidumpAnalyzer
                     ? "Octets à RIP : absents des plages capturées."
                     : "Octets à RIP : " + Convert.ToHexString(codeBytes));
                 output.AppendLine($"RIP relatif à ucrtbase.dll (si base 0x7FFB2D3C0000) : 0x{rip - 0x7FFB2D3C0000:X}");
+                AnalyzeStackCandidates(output, ReadMemory, rsp, modules);
             }
             else output.AppendLine("Contexte CPU AMD64 absent ou RVA invalide.");
         }
@@ -210,6 +214,52 @@ public static class WerMinidumpAnalyzer
         return output.ToString();
     }
 
+
+
+    private static void AnalyzeStackCandidates(StringBuilder output, Func<ulong, int, byte[]?> read,
+        ulong rsp, IReadOnlyList<ModuleRange> modules)
+    {
+        output.AppendLine();
+        output.AppendLine("[PILE HÔTE — CANDIDATS D'ADRESSES DE RETOUR]");
+        const int before = 0x100;
+        const int after = 0x2000;
+        if (rsp < before)
+        {
+            output.AppendLine("RSP trop bas pour lire la fenêtre de pile.");
+            return;
+        }
+
+        ulong start = rsp - before;
+        byte[]? stack = read(start, before + after);
+        if (stack is null)
+        {
+            output.AppendLine($"Fenêtre de pile non capturée : [0x{start:X}, 0x{start + before + after:X}).");
+            return;
+        }
+
+        output.AppendLine($"Fenêtre brute : [0x{start:X}, 0x{start + (ulong)stack.Length:X}) | RSP à +0x{before:X}");
+        int found = 0;
+        for (int offset = 0; offset <= stack.Length - 8; offset += 8)
+        {
+            ulong value = BitConverter.ToUInt64(stack, offset);
+            foreach (var module in modules)
+            {
+                if (value < module.Base || value - module.Base >= module.Size) continue;
+                output.AppendLine($"  pile+0x{offset:X} (0x{start + (ulong)offset:X}) = 0x{value:X} -> {module.Name}+0x{value - module.Base:X}");
+                found++;
+                break;
+            }
+            if (found >= 96)
+            {
+                output.AppendLine("  Limite de 96 candidats atteinte.");
+                break;
+            }
+        }
+
+        if (found == 0)
+            output.AppendLine("Aucune valeur de la fenêtre ne pointe dans un module déclaré.");
+        output.AppendLine($"Candidats trouvés : {found}. Ce balayage brut ne constitue pas un unwind x64 : certains pointeurs peuvent être des données, pas des adresses de retour.");
+    }
 
     private static string ReadMinidumpString(BinaryReader br, uint rva, long fileLength)
     {
