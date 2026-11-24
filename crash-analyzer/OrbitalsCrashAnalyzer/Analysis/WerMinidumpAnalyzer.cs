@@ -9,9 +9,11 @@ namespace OrbitalsCrashAnalyzer.Analysis;
 public static class WerMinidumpAnalyzer
 {
     private const uint Signature = 0x504D444D; // MDMP
+    private const uint ThreadListStream = 3;
+    private const uint ModuleListStream = 4;
+    private const uint MemoryListStream = 5;
     private const uint ExceptionStream = 6;
     private const uint Memory64ListStream = 9;
-    private const uint ModuleListStream = 4;
     private const ulong SuspectIatSlot = 0x7FF6CA527650;
 
     private sealed record MemoryRange(ulong Start, ulong Size, ulong FileOffset);
@@ -36,7 +38,7 @@ public static class WerMinidumpAnalyzer
             throw new InvalidDataException("Répertoire des streams minidump invalide.");
 
         output.AppendLine($"Streams : {streamCount} | répertoire : 0x{directoryRva:X}");
-        uint exceptionRva = 0, exceptionSize = 0, memoryRva = 0, memorySize = 0, moduleRva = 0, moduleSize = 0;
+        uint exceptionRva = 0, exceptionSize = 0, memoryRva = 0, memorySize = 0, moduleRva = 0, moduleSize = 0, threadRva = 0, threadSize = 0, memoryListRva = 0, memoryListSize = 0;
         for (uint i = 0; i < streamCount; i++)
         {
             long entry = (long)directoryRva + i * 12L;
@@ -44,6 +46,8 @@ public static class WerMinidumpAnalyzer
             uint size = ReadU32(br, entry + 4);
             uint rva = ReadU32(br, entry + 8);
             if ((ulong)rva + size > (ulong)fs.Length) continue;
+            if (type == ThreadListStream) { threadRva = rva; threadSize = size; }
+            if (type == MemoryListStream) { memoryListRva = rva; memoryListSize = size; }
             if (type == ExceptionStream) { exceptionRva = rva; exceptionSize = size; }
             if (type == Memory64ListStream) { memoryRva = rva; memorySize = size; }
             if (type == ModuleListStream) { moduleRva = rva; moduleSize = size; }
@@ -71,6 +75,55 @@ public static class WerMinidumpAnalyzer
             output.AppendLine($"Memory64List : {ranges.Count:N0} plages exploitables (RVA données 0x{baseRva:X})");
         }
         else output.AppendLine("Memory64List : absent — lecture mémoire virtuelle impossible.");
+
+        // MemoryListStream (type 5) uses per-range RVAs, separate from Memory64List.
+        if (memoryListRva != 0 && memoryListSize >= 4)
+        {
+            uint count = ReadU32(br, memoryListRva);
+            if (count <= 2_000_000 && 4UL + (ulong)count * 16UL <= memoryListSize)
+            {
+                int added = 0;
+                for (uint i = 0; i < count; i++)
+                {
+                    long d = (long)memoryListRva + 4L + i * 16L;
+                    ulong start = ReadU64(br, d);
+                    uint size = ReadU32(br, d + 8);
+                    uint dataRva = ReadU32(br, d + 12);
+                    if (size == 0 || (ulong)dataRva + size > (ulong)fs.Length) continue;
+                    ranges.Add(new MemoryRange(start, size, dataRva));
+                    added++;
+                }
+                output.AppendLine($"MemoryList : {added:N0} plages supplémentaires.");
+            }
+            else output.AppendLine("MemoryList présent mais compte/taille invalide.");
+        }
+
+        // A thread's stack is described directly by MINIDUMP_THREAD.Stack.
+        if (threadRva != 0 && threadSize >= 4)
+        {
+            uint count = ReadU32(br, threadRva);
+            if (count <= 100_000 && 4UL + (ulong)count * 48UL <= threadSize)
+            {
+                output.AppendLine($"ThreadList : {count} threads");
+                for (uint i = 0; i < count; i++)
+                {
+                    long t = (long)threadRva + 4L + i * 48L;
+                    uint id = ReadU32(br, t);
+                    ulong stackStart = ReadU64(br, t + 32);
+                    uint stackSize = ReadU32(br, t + 40);
+                    uint stackDataRva = ReadU32(br, t + 44);
+                    if (stackSize > 0 && (ulong)stackDataRva + stackSize <= (ulong)fs.Length)
+                    {
+                        // Add explicit thread stack mapping even if it was not in Memory64List.
+                        ranges.Add(new MemoryRange(stackStart, stackSize, stackDataRva));
+                        output.AppendLine($"  Thread 0x{id:X}: pile [0x{stackStart:X}, 0x{stackStart + stackSize:X}) ({stackSize:N0} octets){(id == (exceptionRva != 0 ? ReadU32(br, exceptionRva) : 0) ? " — thread fautif" : "")}");
+                    }
+                    else if (id == (exceptionRva != 0 ? ReadU32(br, exceptionRva) : 0))
+                        output.AppendLine($"  Thread fautif 0x{id:X}: descripteur de pile vide/non capturé.");
+                }
+            }
+            else output.AppendLine("ThreadList présent mais compte/taille invalide.");
+        }
 
         byte[]? ReadMemory(ulong address, int length)
         {
