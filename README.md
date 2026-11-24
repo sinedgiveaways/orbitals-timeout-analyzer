@@ -19,3 +19,5 @@ Le workflow GitHub Actions construit et publie une version autonome pour Windows
 
 - [Rapport ciblé de provenance du pointeur Crash B](docs/CRASH_B_POINTER_PROVENANCE.md)
 - [Résultats QWORD Hunter et 12 candidats Crash B](docs/CRASH_B_CANDIDATES_12.md)
+
+- [Crash C — WER minidump / ucrtbase.dll](docs/CRASH_C_WER_UCRTBASE.md) — paramètres apparents de copie, source suspecte, pile hôte, limites et prochaines étapes.
