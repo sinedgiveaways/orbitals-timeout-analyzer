@@ -106,7 +106,7 @@ public static class WerMinidumpAnalyzer
             for (uint i = 0; i < parameterCount; i++)
                 output.AppendLine($"  ExceptionInformation[{i}] = 0x{ReadU64(br, er + 32 + i * 8L):X}");
 
-            uint contextRva = ReadU32(br, (long)exceptionRva + 160);
+            uint contextRva = ReadU32(br, (long)exceptionRva + 164);
             if (contextRva != 0 && (ulong)contextRva + 256 <= (ulong)fs.Length)
             {
                 // AMD64 CONTEXT: general registers begin at +120; RIP at +248.
