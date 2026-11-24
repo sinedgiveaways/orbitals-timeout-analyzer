@@ -8,6 +8,7 @@ Les résultats de l'investigation sont conservés dans le dossier [docs/](docs/I
 - [Index et état global](docs/INVESTIGATION_INDEX.md)
 - [Crash A — FMallocBinned3 / GOT-PLT](docs/CRASH_A.md)
 - [Crash B — accès 0x104 / TLS](docs/CRASH_B.md)
+- [Crash C — WER minidump / ucrtbase.dll](docs/CRASH_C_WER_UCRTBASE.md)
 - [Environnement et contraintes de build](docs/ENVIRONMENT_AND_BUILD.md)
 
 Les documents séparent les faits établis, les hypothèses et les inconnues. Ils ne remplacent pas les logs bruts, qui doivent être conservés séparément.
