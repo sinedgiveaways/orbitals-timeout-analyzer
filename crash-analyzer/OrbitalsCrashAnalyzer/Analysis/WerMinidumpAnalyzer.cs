@@ -253,7 +253,67 @@ public static class WerMinidumpAnalyzer
         uint importSize = BitConverter.ToUInt32(opt, 124);
         uint iatRva = BitConverter.ToUInt32(opt, 208);
         uint iatSize = BitConverter.ToUInt32(opt, 212);
+        uint relocRva = BitConverter.ToUInt32(opt, 152);
+        uint relocSize = BitConverter.ToUInt32(opt, 156);
+        ushort sectionCount = BitConverter.ToUInt16(nt, 6);
         output.AppendLine($"  PE32+ : ImportDirectory RVA=0x{importRva:X}/0x{importSize:X} | IAT RVA=0x{iatRva:X}/0x{iatSize:X}");
+        output.AppendLine($"  BaseRelocationDirectory RVA=0x{relocRva:X}/0x{relocSize:X} | sections={sectionCount}");
+
+        bool slotSectionFound = false;
+        ulong sectionTableAddress = imageBase + peOffset + 24UL + optionalSize;
+        for (uint sectionIndex = 0; sectionIndex < sectionCount && sectionIndex < 96; sectionIndex++)
+        {
+            byte[]? section = read(sectionTableAddress + sectionIndex * 40UL, 40);
+            if (section is null) { output.AppendLine("  Section headers non capturés."); break; }
+            string sectionName = Encoding.ASCII.GetString(section, 0, 8).TrimEnd('\0');
+            uint virtualSize = BitConverter.ToUInt32(section, 8);
+            uint virtualAddress = BitConverter.ToUInt32(section, 12);
+            uint rawSize = BitConverter.ToUInt32(section, 16);
+            uint rawPointer = BitConverter.ToUInt32(section, 20);
+            uint characteristics = BitConverter.ToUInt32(section, 36);
+            ulong span = Math.Max(virtualSize, rawSize);
+            if (slotRva >= virtualAddress && (ulong)slotRva < (ulong)virtualAddress + span)
+            {
+                slotSectionFound = true;
+                output.AppendLine($"  SECTION DU SLOT : {sectionName} | RVA=0x{virtualAddress:X} | VirtualSize=0x{virtualSize:X} | RawSize=0x{rawSize:X} | RawPtr=0x{rawPointer:X} | Characteristics=0x{characteristics:X}");
+                output.AppendLine($"    Writable={(characteristics & 0x80000000) != 0} Executable={(characteristics & 0x20000000) != 0} Readable={(characteristics & 0x40000000) != 0}");
+            }
+        }
+        if (!slotSectionFound) output.AppendLine("  Aucune section PE ne couvre le RVA du slot (headers absents ou image atypique).");
+        DumpBytes(output, read, imageBase + slotRva, 32, "Octets autour du slot");
+
+        if (relocRva != 0 && relocSize >= 8 && relocRva < imageSize)
+        {
+            bool relocFound = false;
+            ulong cursor = 0;
+            uint blocks = 0;
+            while (cursor + 8 <= relocSize && blocks++ < 100000)
+            {
+                byte[]? block = read(imageBase + relocRva + cursor, 8);
+                if (block is null) { output.AppendLine("  Table de relocations partiellement/non capturée."); break; }
+                uint pageRva = BitConverter.ToUInt32(block, 0);
+                uint blockSize = BitConverter.ToUInt32(block, 4);
+                if (pageRva == 0 && blockSize == 0) break;
+                if (blockSize < 8 || (blockSize & 1) != 0 || cursor + blockSize > relocSize) break;
+                uint entries = (blockSize - 8) / 2;
+                for (uint e = 0; e < entries; e++)
+                {
+                    byte[]? entryBytes = read(imageBase + relocRva + cursor + 8UL + e * 2UL, 2);
+                    if (entryBytes is null) break;
+                    ushort entry = BitConverter.ToUInt16(entryBytes, 0);
+                    ushort type = (ushort)(entry >> 12);
+                    uint targetRva = pageRva + (uint)(entry & 0x0FFF);
+                    if (targetRva == slotRva)
+                    {
+                        relocFound = true;
+                        output.AppendLine($"  RELOCATION DU SLOT : type={type} ({(type == 10 ? "IMAGE_REL_BASED_DIR64" : type == 0 ? "ABSOLUTE" : "autre")}) target RVA=0x{targetRva:X}");
+                    }
+                }
+                cursor += blockSize;
+            }
+            if (!relocFound) output.AppendLine("  Aucune relocation de base ne cible exactement ce slot.");
+        }
+        else output.AppendLine("  Répertoire de relocations absent/invalide.");
         if (slotRva >= iatRva && slotRva - iatRva < iatSize)
             output.AppendLine($"  Le slot tombe dans la plage IAT déclarée (index {(slotRva - iatRva) / 8}, décalage {(slotRva - iatRva) % 8}).");
         else
