@@ -12,6 +12,7 @@ public partial class MainWindow : Window
     private string? _logPath;
     private string? _mainPath;
     private string? _sdkPath;
+    private string? _dumpPath;
     private string _lastReport = "Profil TLS préchargé. Les fichiers complémentaires sont facultatifs.";
 
     public MainWindow()
@@ -40,6 +41,16 @@ public partial class MainWindow : Window
         var d = new OpenFileDialog { Title = "Ajouter exefs/sdk (facultatif)", Filter = "NSO / sdk|sdk;*.nso|Tous les fichiers|*.*" };
         if (d.ShowDialog() != true) return;
         _sdkPath = d.FileName; SdkPathText.Text = _sdkPath; RunAnalysis();
+    }
+
+
+    private void LoadDump_Click(object sender, RoutedEventArgs e)
+    {
+        var d = new OpenFileDialog { Title = "Charger le minidump WER Orbitals", Filter = "Minidump Windows|*.dmp;*.mdmp|Tous les fichiers|*.*" };
+        if (d.ShowDialog() != true) return;
+        _dumpPath = d.FileName;
+        DumpPathText.Text = _dumpPath;
+        RunAnalysis();
     }
 
     private void Analyze_Click(object sender, RoutedEventArgs e) => RunAnalysis();
@@ -100,6 +111,14 @@ public partial class MainWindow : Window
             report.AppendLine();
             report.AppendLine(TlsDeepAnalyzer.Analyze(_mainPath, _sdkPath, logText));
 
+            if (_dumpPath is not null)
+            {
+                report.AppendLine();
+                report.AppendLine(WerMinidumpAnalyzer.Analyze(_dumpPath));
+            }
+            else
+                report.AppendLine("\n[WER] Aucun minidump chargé. Charger le fichier .dmp pour analyser automatiquement l'exception, les registres AMD64, les plages mémoire, la structure Crash C et la vtable connue.");
+
             report.AppendLine();
             report.AppendLine("[MODE D'EMPLOI]");
             report.AppendLine("Le log, main et sdk sont désormais facultatifs. Commencer par lire le profil préchargé. Ajouter seulement le fichier nécessaire à la question en cours. L'application analyse localement les fichiers choisis et ne les téléverse pas.");
@@ -117,7 +136,7 @@ public partial class MainWindow : Window
 
     private void Export_Click(object sender, RoutedEventArgs e)
     {
-        var d = new SaveFileDialog { Title = "Exporter le rapport complet", Filter = "Rapport texte|*.txt", FileName = "OrbitalsCrashReport_TLS.txt" };
+        var d = new SaveFileDialog { Title = "Exporter le rapport complet", Filter = "Rapport texte|*.txt", FileName = "OrbitalsCrashReport.txt" };
         if (d.ShowDialog() != true) return;
         File.WriteAllText(d.FileName, _lastReport, new UTF8Encoding(false));
         MessageBox.Show(this, "Rapport exporté.", "Orbitals Crash Analyzer", MessageBoxButton.OK, MessageBoxImage.Information);
