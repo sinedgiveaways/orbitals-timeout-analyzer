@@ -1,14 +1,15 @@
 # Orbitals Recomp — dossier d'investigation
 
-Dernière mise à jour : 2026-11-21  
+Dernière mise à jour : 2026-11-24  
 Dépôt : `sinedgiveaways/orbitals-timeout-analyzer`
 
 ## Objectif
 
-Conserver dans le dépôt les faits techniques établis pendant l'analyse des plantages d'Orbitals Recomp, distinguer les observations des hypothèses et éviter de refaire les mêmes recherches. Le dossier est organisé autour de deux incidents indépendants.
+Conserver dans le dépôt les faits techniques établis pendant l'analyse des plantages d'Orbitals Recomp, distinguer les observations des hypothèses et éviter de refaire les mêmes recherches. Le dossier distingue maintenant trois incidents indépendants.
 
 - [Crash A — FMallocBinned3 / pointeur non reconnu](CRASH_A.md)
 - [Crash B — accès mémoire 0x104 / chemin TLS](CRASH_B.md)
+- [Crash C — WER minidump / ucrtbase.dll](CRASH_C_WER_UCRTBASE.md)
 - [Environnement, builds et contraintes de travail](ENVIRONMENT_AND_BUILD.md)
 
 
@@ -19,11 +20,12 @@ Conserver dans le dépôt les faits techniques établis pendant l'analyse des pl
 
 ## Priorités
 
-1. **Crash B est la priorité actuelle.** L'accès à `0x104` et le chemin TLS restent à expliquer.
-2. **Crash A est suspendu**, pas résolu ni abandonné. Les recherches GOT/PLT déjà faites sont consignées dans son dossier.
-3. Ne pas lancer une préparation, génération ou recompilation complète du jeu pour une simple analyse de logs ou de binaires.
-4. Ne pas utiliser Ghidra : l'utilisateur ne souhaite pas cet outil.
-5. Fournir un analyseur Windows GUI plutôt que multiplier les scripts PowerShell manuels.
+1. **Crash C est la piste immédiate issue du dump WER du 24-11-2026.** Résoudre le thunk et la provenance de la source suspecte ; voir `CRASH_C_WER_UCRTBASE.md`.
+2. **Crash B reste une investigation distincte et non résolue.** L'accès à `0x104` et le chemin TLS restent à expliquer.
+3. **Crash A est suspendu**, pas résolu ni abandonné. Les recherches GOT/PLT déjà faites sont consignées dans son dossier.
+4. Ne pas lancer une préparation, génération ou recompilation complète du jeu pour une simple analyse de logs ou de binaires.
+5. Ne pas utiliser Ghidra : l'utilisateur ne souhaite pas cet outil.
+6. Fournir un analyseur Windows GUI plutôt que multiplier les scripts PowerShell manuels.
 
 ## Règles de preuve
 
