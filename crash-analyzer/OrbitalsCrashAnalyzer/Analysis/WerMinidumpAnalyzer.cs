@@ -218,7 +218,7 @@ public static class WerMinidumpAnalyzer
         if (byteLength > 32768 || (ulong)rva + 4UL + byteLength > (ulong)fileLength || (byteLength & 1) != 0)
             return "<nom invalide>";
         br.BaseStream.Position = (long)rva + 4;
-        return Encoding.Unicode.GetString(br.ReadBytes((int)byteLength)).TrimEnd('\\0');
+        return Encoding.Unicode.GetString(br.ReadBytes((int)byteLength)).TrimEnd('\0');
     }
 
     private static void AnalyzePeSlot(StringBuilder output, Func<ulong, int, byte[]?> read,
