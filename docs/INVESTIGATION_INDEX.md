@@ -174,3 +174,16 @@ Le nouveau `orbitals(2).log` reproduit Crash B à `main+0x1759b20`, lecture hôt
 Le rapport [CRASH_B_AUDIT_2026-11-23.md](CRASH_B_AUDIT_2026-11-23.md) corrige les suppositions sur le mapping registres hôte/invité, clarifie la portée réelle de l'instrumentation TLS par thread (commit `9dd31b1`, artifact CI `44900273712`) et distingue les éléments confirmés des captures encore manquantes. Il précise notamment que le message « no entry captured » du build `g80c5db8` ne teste pas cette instrumentation, que son exécution avec `ORBITALS_TLS_DIAG=1` n'est pas encore confirmée et qu'une capture au milieu de `main+0x1759b20`, à `main+0x175A030`, reste nécessaire.
 
 **Priorité immédiate :** réutiliser l'artifact instrumenté déjà téléchargé si ce n'est pas déjà fait, puis obtenir une capture synchronisée au site de lecture fautif et comparer le conteneur/index du consommateur avec le producteur candidat. Aucun scan COFF déjà effectué ni cycle complet `prepare.py` / génération / recompilation ne doit être relancé.
+
+
+## Crash C — WER minidump / ucrtbase.dll — 24-11-2026
+
+Un troisième incident distinct est consigné dans [CRASH_C_WER_UCRTBASE.md](CRASH_C_WER_UCRTBASE.md). Le dump `orbitals-recomp.exe.16952.dmp` (~8,8 Go) montre une AV de lecture dans `ucrtbase.dll+0xEE44D` (`0x7FFB2D4AE44D`), instruction `vmovdqu ymm0,[rdx]`, thread `0x5B10`. Windows signale une lecture à `0xFFFFFFFFFFFFFFFF`, tandis que le contexte sauvegardé contient `RDX=0x01460149013D0140` : cette incohérence doit rester explicitement ouverte.
+
+Une structure à `0x1C92EAB0540` contient les paramètres apparents d'une copie : destination `0x12E1A8000C`, source suspecte `0x01460149013D0140`, taille `0x05240500` (86 246 656 octets / 82,25 Mio), marqueur `0x17EA5678`. La destination est dans une région enregistrée par le dump ; aucune région capturée ne couvre la source. L'absence de la source dans le dump n'est pas, à elle seule, une preuve d'adresse non mappée, car la capture mémoire peut être incomplète.
+
+La pile et le code autour de `orbitals-recomp.exe+0x40D1F` montrent la préparation de `RCX=destination`, `RDX=source`, `R8=taille`, puis un appel via le thunk `0x7FF6C896C430`. Le wrapper examiné à `orbitals-recomp.exe+0x20810` n'est pas encore relié de façon démontrée à ce thunk. Le slot relevé à `0x7FF6CA527650` contient `0x10000`, donc ne résout pas la cible. Le scan exploratoire des appels directs vers le wrapper n'a pas donné de résultat.
+
+**Priorité Crash C :** résoudre la cible effective du thunk, reconstruire les registres au point exact de l'exception pour expliquer l'écart avec `ExceptionInformation[1]`, puis remonter la provenance de la source. Aucun correctif n'est validé. Crash C ne doit pas être confondu avec Crash B TLS ni Crash A FMallocBinned3.
+
+Les conclusions, limites, offsets et prochaines étapes sont détaillés dans le rapport dédié. Aucun rebuild complet du jeu n'est nécessaire pour cette analyse.
